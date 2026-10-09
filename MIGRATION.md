@@ -527,3 +527,18 @@ decoder rejects v2 checkpoints and unknown envelope/geometry fields; no v2
 compatibility decoder is provided. Provenance configuration is an opaque JSON
 object to checkpoint restoration and is not validated against the current
 generator implementation.
+
+### Dynamic Environment owner adoption
+
+| Target element | Disposition | Target path | Boundary / evidence |
+| --- | --- | --- | --- |
+| One stable movable-object position in an explicitly described frame | REWRITE / target-authored capability | `src/environment/dynamic_state.py::DynamicObjectState` | Position values are metres in a persisted `FrameDescriptor`. This is a bounded state fixture, not a general Environment ontology or solver contract. |
+| Candidate validation and state adoption | REWRITE / target-authored owner boundary | `DynamicEnvironmentOwner.validate_and_adopt` | Requires World/step/Environment correlation, active Environment revision, next source causal tick, stable object identity and the same declared frame. Invalid candidates do not mutate owner state. |
+| Owner checkpoint and restore | REWRITE / target-authored checkpoint | `DynamicEnvironmentOwner.checkpoint_bytes` / `from_checkpoint_bytes` | Closed v1 schema persists Environment identity/revision, explicit frame, object identity/position, and last accepted correlation. Unknown fields and unsupported versions are rejected. |
+| World causal commit and restore-continuation integration | REWRITE / local integration evidence | workspace `tests/integration/test_environment_dynamic_causal_step.py` | Exercises deterministic candidate adoption, committed owner reference, restore plus another step, and stale-candidate recovery-required behavior using the current World runtime. This workspace test remains local and is not committed here. |
+
+The integration candidate is a deterministic fixture input. This slice does not
+implement or validate environmental dynamics, a physical law, solver behavior,
+calibration, material properties, scientific equivalence, production crash or
+power-loss recovery, or the complete Biopeia physical vertical slice. The
+historical hex/environment runtime and tests are not inputs to this capability.

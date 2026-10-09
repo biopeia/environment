@@ -1,5 +1,6 @@
 """Environment-owned external state and physical-scene capabilities."""
 
+from environment.dynamic_state import DynamicEnvironmentCandidate, DynamicEnvironmentOwner, DynamicObjectState
 from environment.identified_resource import IdentifiedFiniteResource
 from environment.procedural_genesis import (
     GENERATOR_ID,
@@ -29,6 +30,9 @@ __all__ = [
     "EnvironmentGenesisConfig",
     "EnvironmentGenesisProvenance",
     "EnvironmentGenesisSpec",
+    "DynamicEnvironmentCandidate",
+    "DynamicEnvironmentOwner",
+    "DynamicObjectState",
     "FiniteResourceState",
     "FrameDescriptor",
     "IdentifiedFiniteResource",
