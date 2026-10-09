@@ -498,3 +498,14 @@ This audit did not inspect every scientific result, run bundle, protocol artifac
 ### Audit method and validation
 
 The audit used `git ls-tree -r` and blob resolution at the pinned source commit, per-path `git log -1` for path commits, source AST/module inventory and direct import/reference search. It did not run historical source tests or mutate the source repository: those checks would validate old behavior, not target semantics. This change is documentation-only; validation is `git diff --check`, tracked-file inventory reconciliation against the pinned source tree, and target Markdown/governance CI. PR #26's procedural genesis capability is recorded separately above and is not a disposition of legacy hex genesis symbols.
+
+### Identified resource checkpoint schema policy
+
+The Biopeia identified-resource checkpoint v1 and its nested finite-resource
+checkpoint v1 are closed schemas: each decoder requires exactly the declared
+fields and rejects unknown fields at both levels. A future field or semantic
+change requires an explicit checkpoint contract version rather than silent
+forward acceptance. This policy follows the Architecture Owner's Biopeia
+migration ratification of 2026-10-09 (closed Environment checkpoint schema;
+reject unknown fields); it is not a compatibility promise for historical
+source payloads.
