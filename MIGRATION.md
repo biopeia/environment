@@ -73,6 +73,25 @@
    source v1 resource checkpoint shape. This is not proof that the prior runtime
    integration conforms to the TARGET authority contract.
 
+8. Split the deterministic static terrain-field initialization from the mixed
+   source `DynamicGeography` into `TerrainFieldState`. Provenance: pinned source
+   `environment/src/environment/terrain.py` at source SHA
+   `80d372a186513035f85a769db886e505cabba52d`, introduced into that path by
+   source commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`; source behavioral
+   test reference is
+   `lab/tests/unit/lab/world/test_terrain_and_movement.py`. Disposition:
+   `SPLIT`. The extraction contains only deterministic initialization and
+   read-only access for elevation, permeability, moisture, temperature, and
+   fertility. It does not copy traversal, topology bounds, occupancy, hydrology,
+   disturbance, detritus, ecological pressure, organism-presence/death inputs,
+   substrate impulse, or checkpoint serialization. The generation seed and
+   dimensions are explicit inputs; source modulo-1000 seed phase and numeric
+   formulas/rounding are preserved. The source tests live with Lab's World
+   tests and do not by themselves establish that this mechanism is active in
+   productive runtime or scientifically validated. This target module is an
+   owner-aligned environmental state candidate, not evidence that the old
+   DynamicGeography path should be retained wholesale.
+
 ## Validation scope
 
 The selected package has no first-party runtime dependency beyond the Python standard library. Validation is scoped to the copied/split laws and environmental-state unit tests. Passing tests do not establish scientific adequacy of any ecological law or complete migration of the source Environment package.
