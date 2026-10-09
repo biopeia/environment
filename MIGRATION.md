@@ -371,7 +371,7 @@ The workspace-level integration tests are outside the source repository and thei
 
 This audit supplies candidates only. Before declaring Environment migration complete, review each row with the responsible owner, select one final disposition (`MOVE`, `SPLIT`, `REWRITE`, `DROP`, or a time-bounded `DEFER`), identify a target path/owner where applicable, and record tests/evidence and caveats. The combined Lab consumers and cross-repository integration fixtures need explicit follow-up; static import search does not determine scientific admissibility or prove that a candidate is unused. No migration of source files is performed by this inventory PR.
 
-Direct test/experiment consumers outside `environment/tests` at the same source pin were found at these exact paths; this complements, and does not replace, the owning Lab inventory:
+Twenty direct test/experiment consumer paths outside `environment/tests` were found at the same source pin, followed by one benchmark path. The list below has 21 paths total; it complements, and does not replace, the owning Lab inventory:
 
 - `lab/tests/experiments/protocols/test_visual_acquisition_protocol.py`
 - `lab/tests/integration/test_physics3d_effective_model_audit.py`, `lab/tests/integration/test_physics3d_vision.py`
@@ -382,4 +382,4 @@ Direct test/experiment consumers outside `environment/tests` at the same source 
 - `tests/experimental_integrity/test_embodiment_inheritance_integrity.py`
 - `scripts/bench_world_journal_index.py` (benchmark consumer, not a test)
 
-The direct-import search returned 66 Python paths total when including the Environment package/tests, Lab production modules, Lab tests/experiments, benchmark, and experimental-integrity test. The consumer set is mixed and includes historical World runtime tests; it is not a count of active production routes. A test reference alone is not evidence for retaining its source API.
+The direct-import search returned 66 Python paths total, comprising the Environment package/tests, Lab production modules, 20 direct test/experiment consumer paths listed above, and one benchmark path. The consumer set is mixed and includes historical World runtime tests; it is not a count of active production routes. A test reference alone is not evidence for retaining its source API.
