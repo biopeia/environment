@@ -182,3 +182,9 @@ equations. Tick ordering, occupancy/death interpretation and deposition,
 active-cell selection, topology traversal, World state, and persistence remain
 caller-owned and are not migrated. These are preserved current software rules,
 not claims of scientific validity or calibration.
+
+## Rejected source slice: hex-bound substrate impulse
+
+| Source path/symbol | Source commit / pinned revision | Target disposition | Reason, evidence, and caveats |
+| --- | --- | --- | --- |
+| `environment/src/environment/terrain.py::DynamicGeography.apply_directional_impulse` | Path commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`; source SHA `80d372a186513035f85a769db886e505cabba52d`; blob `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2` | `DROP` from target repository `biopeia/environment`; no target path | The implementation and tests depend on `HexCoord` and finite q/r grid bounds, and its normalized/clamped `magnitude` has no physical unit or reference frame. The behavior is not an engine-independent physical contract and has no ratified scientific/physical semantics for the canonical continuous-3D path. Source behavior/tests remain in the intact historical monorepo as evidence only. No hex compatibility API is provided. Source test references: `lab/tests/unit/lab/world/test_terrain_and_movement.py::test_directional_impulse_redistributes_existing_substrate_without_semantic_action` and `test_substrate_impulse_is_transactionally_rolled_back`; `lab/tests/unit/lab/world/test_actuation_adapter.py` also calls the method. The candidate Biopeia/environment PR #15 was closed without merge. |
