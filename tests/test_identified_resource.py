@@ -12,6 +12,11 @@ def test_identified_resource_checkpoint_preserves_owner_identity_and_state() -> 
     encoded = owner.checkpoint_bytes()
     restored = IdentifiedFiniteResource.from_checkpoint_bytes(encoded)
 
+    payload = json.loads(encoded)
+    assert payload["checkpoint_type"] == "biopeia.environment.identified-finite-resource"
+    assert payload["checkpoint_version"] == 1
+    assert payload["state"]["checkpoint_type"] == "biopeia.environment.finite-resource-state"
+    assert payload["state"]["checkpoint_version"] == 1
     assert encoded == owner.checkpoint_bytes()
     assert restored.resource_id == "resource.alpha"
     assert restored.state.checkpoint() == owner.state.checkpoint()
@@ -28,20 +33,35 @@ def test_identified_resource_checkpoint_rejects_invalid_identity_or_shape() -> N
     with pytest.raises(ValueError, match="resource_id"):
         IdentifiedFiniteResource.from_checkpoint_bytes(json.dumps(payload).encode())
 
+    source_v1 = {
+        "schema_version": 1,
+        "resource_id": "resource.alpha",
+        "state": {
+            "schema_version": 1,
+            "position": [3.0, 0.0, 0.18],
+            "radius": 0.18,
+            "field_radius": 6.0,
+            "remaining": 200.0,
+            "transfer_per_tick": 2.0,
+        },
+    }
+    with pytest.raises(ValueError, match="checkpoint fields"):
+        IdentifiedFiniteResource.from_checkpoint_bytes(json.dumps(source_v1).encode())
+
 
 def test_owner_checkpoint_validation_checks_identity_schema_and_bytes() -> None:
     owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=3.5))
     encoded = owner.checkpoint_bytes()
 
     assert IdentifiedFiniteResource.validate_checkpoint(
-        encoded, "resource.alpha", "environment-identified-resource-v1"
+        encoded, "resource.alpha", IdentifiedFiniteResource.OWNER_SCHEMA
     )
     assert not IdentifiedFiniteResource.validate_checkpoint(
-        encoded, "resource.other", "environment-identified-resource-v1"
+        encoded, "resource.other", IdentifiedFiniteResource.OWNER_SCHEMA
     )
     assert not IdentifiedFiniteResource.validate_checkpoint(
         encoded, "resource.alpha", "unsupported-schema"
     )
     assert not IdentifiedFiniteResource.validate_checkpoint(
-        b"not a checkpoint", "resource.alpha", "environment-identified-resource-v1"
+        b"not a checkpoint", "resource.alpha", IdentifiedFiniteResource.OWNER_SCHEMA
     )

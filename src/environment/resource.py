@@ -27,6 +27,9 @@ class FiniteResourceState:
     remaining: float = 200.0
     transfer_per_tick: float = 2.0
 
+    CHECKPOINT_TYPE = "biopeia.environment.finite-resource-state"
+    CHECKPOINT_VERSION = 1
+
     def __post_init__(self) -> None:
         self.position = _finite_vector(self.position, "position")
         self.radius = _positive_finite(self.radius, "radius")
@@ -76,9 +79,10 @@ class FiniteResourceState:
         return consumed
 
     def checkpoint(self) -> dict[str, object]:
-        """Serialize this owner's state using the source model's v1 shape."""
+        """Serialize this state using the Biopeia-owned checkpoint contract."""
         return {
-            "schema_version": 1,
+            "checkpoint_type": self.CHECKPOINT_TYPE,
+            "checkpoint_version": self.CHECKPOINT_VERSION,
             "position": [float(value) for value in self.position],
             "radius": float(self.radius),
             "field_radius": float(self.field_radius),
@@ -88,13 +92,26 @@ class FiniteResourceState:
 
     @classmethod
     def from_checkpoint(
-        cls, payload: Mapping[str, Any] | None
+        cls, payload: Mapping[str, Any]
     ) -> "FiniteResourceState":
-        """Restore validated resource state; ``None`` creates source defaults."""
-        if payload is None:
-            return cls()
-        if int(payload.get("schema_version", -1)) != 1:
-            raise ValueError("unsupported finite resource state")
+        """Restore only the explicitly versioned Biopeia-owned state shape."""
+        expected_keys = {
+            "checkpoint_type",
+            "checkpoint_version",
+            "position",
+            "radius",
+            "field_radius",
+            "remaining",
+            "transfer_per_tick",
+        }
+        if (
+            not isinstance(payload, Mapping)
+            or set(payload) != expected_keys
+            or payload.get("checkpoint_type") != cls.CHECKPOINT_TYPE
+            or isinstance(payload.get("checkpoint_version"), bool)
+            or payload.get("checkpoint_version") != cls.CHECKPOINT_VERSION
+        ):
+            raise ValueError("unsupported finite resource checkpoint contract")
         return cls(
             position=_finite_vector(payload["position"], "position"),
             radius=float(payload["radius"]),
