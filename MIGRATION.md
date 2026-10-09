@@ -43,6 +43,12 @@
 2. `HexCoord` was split from the mixed World topology module into `environment.spatial`; `BodyPlacement`, `HexTopology`, and `OccupancyGrid` remain deferred.
 3. The package export surface is intentionally narrower than the source package.
 4. Python import namespace and distribution are both named `environment`.
+5. Added `EnvironmentState.field_values_at(tick)` as a target-facing, immutable
+   environmental field projection for an explicit non-negative causal tick.
+   This is `REWRITE`/new boundary functionality, not a claim that the source
+   monolith already exposed a pure projection API. It evaluates the existing
+   `GroundTruth` laws without changing Environment state or consulting host
+   time, allowing World to request values for a proposed causal transition.
 
 ## Validation scope
 

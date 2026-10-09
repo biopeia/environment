@@ -4,4 +4,6 @@ This repository contains the first incremental Biopeia Environment extraction: o
 
 It is not the World authority. World identity, presence, occupancy, movement, event journals, causal ordering/commit, and world checkpoint coordination are deliberately not included. It does not contain study controls, Organism goals, rewards, or learned semantics.
 
+`EnvironmentState.field_values_at(tick)` provides an immutable projection of objective field laws at an explicit non-negative causal tick. It is a pure query: it neither advances Environment state nor reads host time. World remains responsible for selecting and committing causal transitions.
+
 The import package and distribution are both named `environment`. The package uses the Python standard library only. See [`MIGRATION.md`](MIGRATION.md) for exact source provenance, dispositions, and deferred scope.
