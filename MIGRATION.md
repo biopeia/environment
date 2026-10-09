@@ -93,7 +93,22 @@
    owner-aligned environmental state candidate, not evidence that the old
    DynamicGeography path should be retained wholesale.
 
-9. Split three pure field equations from `DynamicGeography` into
+9. Added `PhysicalSphere` and `project_resource_geometry(...)` as a `REWRITE`
+   of the Environment-owned geometry projection boundary, derived from
+   `environment/src/environment/physics3d/resource.py::PhysicalResource` at
+   source SHA `80d372a186513035f85a769db886e505cabba52d`. The projection copies
+   only the source-owned center and physical radius into an immutable,
+   engine-neutral value. `field_radius` is a scalar influence radius, not a
+   collider; quantity and transfer limits are not geometry. The source exposes
+   no unit or frame on `PhysicalResource`, so the projection deliberately does
+   not assign either and is not sufficient by itself to configure a solver.
+   `environment/physics3d/environments.py` documents metres and Z-up for its
+   versioned recipes, but that does not establish those semantics for every
+   `PhysicalResource` instance. Contact material, solver construction,
+   coupling, and accepted state transitions remain outside Environment. This
+   is a partial physical projection only, not completion of Objective §14.
+
+10. Split three pure field equations from `DynamicGeography` into
    `src/environment/ecology.py`. Provenance: pinned source
    `environment/src/environment/terrain.py` at source SHA
    `80d372a186513035f85a769db886e505cabba52d`, blob
@@ -106,7 +121,7 @@
    define input validation beyond the source behavior, or include adjacent
    topology-dependent traversal and dynamic update rules.
 
-10. Split deterministic initial surface-water values from the mixed source
+11. Split deterministic initial surface-water values from the mixed source
    `DynamicGeography._initialize_surface_water`. Provenance: pinned source
    `environment/src/environment/terrain.py` at source SHA
    `80d372a186513035f85a769db886e505cabba52d`, introduced into that path by
