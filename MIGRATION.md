@@ -383,3 +383,23 @@ Twenty direct test/experiment consumer paths outside `environment/tests` were fo
 - `scripts/bench_world_journal_index.py` (benchmark consumer, not a test)
 
 The direct-import search returned 66 Python paths total, comprising the Environment package/tests, Lab production modules, 20 direct test/experiment consumer paths listed above, and one benchmark path. The consumer set is mixed and includes historical World runtime tests; it is not a count of active production routes. A test reference alone is not evidence for retaining its source API.
+
+## Target-authored deterministic genesis capability — PR #25
+
+This functional slice is new Biopeia TARGET code, not an extraction, rewrite,
+or compatibility layer for historical `EnvironmentState`/`genesis.py` or any
+hex-grid behavior. No source file, source test, or source dataset was copied.
+
+| TARGET element | Disposition | Evidence / limits |
+| --- | --- | --- |
+| `src/environment/procedural_genesis.py::EnvironmentGenesisSpec` and `EnvironmentGenesisConfig` | REWRITE / target-authored capability | Inputs explicitly identify `environment_seed`, generator ID/revision, environment identity/revision, frame, gravity, ground plane, local metre bounds, count and radius range. No hidden host time, process randomness, or global RNG is read. |
+| `generate_procedural_environment` (`biopeia.environment.sha256-sphere-layout`, revision `1`) | REWRITE / target-authored capability | SHA-256 over canonical explicit inputs plus stable object index determines bounded sphere coordinates/radii. `tests/test_genesis.py` checks same complete spec gives equal output, seed/config affect the output, and invalid generator/config inputs are rejected. |
+| `GeneratedSphere` and `ProceduralEnvironmentScene` | REWRITE / target-authored projection | Geometry is metre-labelled and bound to the scene's declared local frame; objects are opaque physical spheres without cognitive labels. This output is not currently integrated into `StaticEnvironmentOwner` or a solver adapter. |
+
+This is one supported deterministic genesis strategy. It does not make
+procedural generation mandatory, define a universal Environment schema, freeze
+chunks/spatial indexing, claim non-overlapping spheres, define material or
+resource semantics, establish scientific adequacy, or prove cross-version
+equivalence. Explicit/static fixtures remain supported. A changed algorithm
+must use a new generator revision; the current implementation rejects unknown
+identity/revision pairs rather than silently applying another algorithm.
