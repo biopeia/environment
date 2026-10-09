@@ -35,7 +35,7 @@ def test_resource_debits_only_accepted_material_with_transfer_bound() -> None:
     assert resource.remaining == pytest.approx(7.6)
 
 
-def test_resource_checkpoint_round_trip_preserves_source_v1_shape() -> None:
+def test_resource_checkpoint_round_trip_uses_target_owned_identity_and_version() -> None:
     resource = FiniteResourceState(
         position=(2.0, -1.0, 0.5),
         radius=0.25,
@@ -44,7 +44,8 @@ def test_resource_checkpoint_round_trip_preserves_source_v1_shape() -> None:
         transfer_per_tick=1.25,
     )
     expected = {
-        "schema_version": 1,
+        "checkpoint_type": "biopeia.environment.finite-resource-state",
+        "checkpoint_version": 1,
         "position": [2.0, -1.0, 0.5],
         "radius": 0.25,
         "field_radius": 4.0,
@@ -55,6 +56,20 @@ def test_resource_checkpoint_round_trip_preserves_source_v1_shape() -> None:
     assert resource.checkpoint() == expected
     restored = FiniteResourceState.from_checkpoint(expected)
     assert restored.checkpoint() == expected
+
+
+def test_resource_checkpoint_rejects_source_era_v1_shape() -> None:
+    source_v1 = {
+        "schema_version": 1,
+        "position": [2.0, -1.0, 0.5],
+        "radius": 0.25,
+        "field_radius": 4.0,
+        "remaining": 7.5,
+        "transfer_per_tick": 1.25,
+    }
+
+    with pytest.raises(ValueError, match="checkpoint contract"):
+        FiniteResourceState.from_checkpoint(source_v1)
 
 
 @pytest.mark.parametrize(
