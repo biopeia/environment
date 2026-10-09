@@ -21,6 +21,7 @@
 | `tests/unit/test_laws.py` | `environment/tests/unit/world/test_laws.py` | MOVE | Focused law tests. |
 | `tests/unit/test_genesis.py` | `environment/tests/unit/world/test_genesis.py` | SPLIT | Focused environmental-state coverage; import updated to `EnvironmentState` and `HexCoord`. |
 | `tests/unit/test_genesis_regional.py` | `environment/tests/unit/world/test_genesis_regional.py` | SPLIT | Focused regional environmental-law coverage; imports updated. |
+| `src/environment/ecology.py` | `environment/src/environment/terrain.py` (`DynamicGeography.effective_permeability`, `effective_fertility`, `resource_renewal_factor`) | SPLIT | Pure equations for existing ecological fields; no cell storage, topology, units, persistence, or World traversal behavior. |
 
 ## Deferred or excluded source families
 
@@ -91,6 +92,40 @@
    productive runtime or scientifically validated. This target module is an
    owner-aligned environmental state candidate, not evidence that the old
    DynamicGeography path should be retained wholesale.
+
+9. Split three pure field equations from `DynamicGeography` into
+   `src/environment/ecology.py`. Provenance: pinned source
+   `environment/src/environment/terrain.py` at source SHA
+   `80d372a186513035f85a769db886e505cabba52d`, blob
+   `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2` (methods
+   `effective_permeability`, `effective_fertility`, and
+   `resource_renewal_factor`). Disposition: `SPLIT`. Coefficients, clamp
+   bounds, and the renewal floor are retained literally. This extracts only
+   calculations over caller-supplied scalar fields; it does not transfer
+   `DynamicGeography` state, establish physical units or scientific validity,
+   define input validation beyond the source behavior, or include adjacent
+   topology-dependent traversal and dynamic update rules.
+
+10. Split deterministic initial surface-water values from the mixed source
+   `DynamicGeography._initialize_surface_water`. Provenance: pinned source
+   `environment/src/environment/terrain.py` at source SHA
+   `80d372a186513035f85a769db886e505cabba52d`, introduced into that path by
+   source commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`. Disposition:
+   `SPLIT`. `initialize_surface_water` requires explicit, complete moisture,
+   elevation, and permeability mappings for every cell in the provided finite
+   rectangular dimensions. It preserves the source formula, cutoff, clamp,
+   and four-decimal rounding. It deliberately does not inherit the source
+   constructor's empty-map generation or partial-map override behavior, and it
+   does not provide implicit field defaults. The function is initialization
+   only: `DynamicGeography.step`, substrate impulses, occupant inputs,
+   persistence, World transaction state, and runtime/Lab wiring remain
+   excluded. Existing source coverage is
+   `lab/tests/unit/lab/world/test_terrain_and_movement.py::test_surface_water_is_deterministic_and_persistent_roundtrip`; it asserts
+   repeatability and serialization roundtrip, not a numeric formula oracle.
+   New target tests exercise the numeric formula, threshold, clamp, immutable
+   result, and complete-input requirement. This does not validate a scientific
+   hydrology model or claim that CURRENT runtime callers use this extracted
+   function.
 
 ## Validation scope
 

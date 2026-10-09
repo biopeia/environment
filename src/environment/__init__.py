@@ -5,6 +5,7 @@ from environment.hydrology import advance_surface_water
 from environment.laws import HazardLaw, PeriodicFieldLaw, ResourceLaw
 from environment.resource import FiniteResourceState
 from environment.spatial import HexCoord
+from environment.surface_water import initialize_surface_water
 from environment.terrain import TerrainFieldState
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "PeriodicFieldLaw",
     "ResourceLaw",
     "TerrainFieldState",
+    "initialize_surface_water",
 ]
