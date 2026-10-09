@@ -1,4 +1,5 @@
 from dataclasses import replace
+import json
 
 import pytest
 
@@ -148,3 +149,48 @@ def test_checkpoint_persists_accepted_step_and_rejects_replay_after_restore():
             StaticSceneCandidate(accepted, restored.scene), expected_correlation=accepted
         )
     assert restored.checkpoint_bytes() == before_replay
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda payload: payload.__setitem__("unexpected", True),
+        lambda payload: payload["scene"].__setitem__("unexpected", True),
+        lambda payload: payload["scene"]["frame"].__setitem__("unexpected", True),
+        lambda payload: payload["scene"]["objects"][0].__setitem__("unexpected", True),
+    ],
+    ids=("root", "scene", "frame", "object"),
+)
+def test_checkpoint_rejects_unknown_fields_at_each_scene_level(mutate):
+    encoded = StaticEnvironmentOwner(scene(), "env-owner").checkpoint_bytes()
+    payload = json.loads(encoded)
+    mutate(payload)
+
+    with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
+        StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
+
+
+def test_checkpoint_rejects_unknown_correlation_fields_without_losing_valid_state():
+    owner = StaticEnvironmentOwner(scene(), "env-owner")
+    accepted = correlation()
+    owner.validate_and_adopt(
+        StaticSceneCandidate(accepted, owner.scene), expected_correlation=accepted
+    )
+    valid_checkpoint = owner.checkpoint_bytes()
+    payload = json.loads(valid_checkpoint)
+    payload["last_accepted_correlation"]["unexpected"] = True
+
+    with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
+        StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
+
+    restored = StaticEnvironmentOwner.from_checkpoint_bytes(valid_checkpoint)
+    assert restored.last_accepted_correlation == accepted
+    assert restored.checkpoint_bytes() == valid_checkpoint
+
+
+def test_checkpoint_rejects_boolean_schema_version():
+    payload = json.loads(StaticEnvironmentOwner(scene(), "env-owner").checkpoint_bytes())
+    payload["schema_version"] = True
+
+    with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
+        StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
