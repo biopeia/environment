@@ -6,6 +6,45 @@ source calculations.
 """
 
 
+from collections.abc import Hashable, Mapping
+from typing import TypeVar
+
+
+Cell = TypeVar("Cell", bound=Hashable)
+
+
+def _decay_sparse_field(
+    field: Mapping[Cell, float], *, multiplier: float, threshold: float
+) -> dict[Cell, float]:
+    """Apply one source sparse-field decay without mutating caller state."""
+    result: dict[Cell, float] = {}
+    for cell, value in field.items():
+        decayed = value * multiplier
+        if decayed >= threshold:
+            result[cell] = round(decayed, 4)
+    return result
+
+
+def decay_traces(field: Mapping[Cell, float]) -> dict[Cell, float]:
+    """Apply the pinned source trace decay (0.94; retain at 0.005)."""
+    return _decay_sparse_field(field, multiplier=0.94, threshold=0.005)
+
+
+def decay_disturbance(field: Mapping[Cell, float]) -> dict[Cell, float]:
+    """Apply the pinned source disturbance decay (0.88; retain at 0.005)."""
+    return _decay_sparse_field(field, multiplier=0.88, threshold=0.005)
+
+
+def decay_detritus(field: Mapping[Cell, float]) -> dict[Cell, float]:
+    """Apply the pinned source detritus decay (0.985; retain at 0.002)."""
+    return _decay_sparse_field(field, multiplier=0.985, threshold=0.002)
+
+
+def decay_ecological_pressure(field: Mapping[Cell, float]) -> dict[Cell, float]:
+    """Apply source ecological-pressure decay (0.92; retain at 0.002)."""
+    return _decay_sparse_field(field, multiplier=0.92, threshold=0.002)
+
+
 def effective_permeability(
     permeability: float,
     disturbance: float,
