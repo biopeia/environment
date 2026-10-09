@@ -234,3 +234,52 @@ implementation. No mechanical HexCoord-to-3D conversion, compatibility
 adapter, or canonical embodied use is authorized. Preserve source evidence in
 the original repository where scientifically or provenance-relevant; do not
 delete that source as part of this target disposition work.
+
+## Provisional per-symbol recommendations: historical hex-spatial family
+
+This provisional review corrects the earlier extraction record; it does not
+erase the fact that these slices were copied into the target repository. The
+whole Environment source inventory remains open, so the outcomes below are
+candidate recommendations only, not final dispositions or authorization to
+delete code. `REWRITE` means that an independently justified TARGET capability
+may be newly implemented. It does not authorize retaining historical code,
+formulas, data formats, APIs, or behavior for backward compatibility. Preserve
+historical source and tests in the original repository as provenance, not as a
+target compatibility suite.
+
+| Source path / symbol | Source provenance | Existing target extraction | Candidate disposition and target meaning |
+| --- | --- | --- | --- |
+| `src/symbiont_world/topology.py::HexCoord` (at the pinned source revision, moved to `environment/src/environment/topology.py`) | Source SHA `80d372a186513035f85a769db886e505cabba52d`; introduced by `7d043253e9e855674fbe363cd17184bd42be8ef4`, moved into Environment at `13720935595fedabec2c376dc933629b0deae5aa`; blob `2bdd5eb8e99b48fb70611c78cc46cdc51a3a2415`. | `src/environment/spatial.py`, target commit `7c0efdb7264596aff5a43b0fe2041dd81aa53c02`; blob `8b5d87c8b68a0453f3c3552c0f21626e4139ca53` at target `main` head `45fd868957e69c6cfd66a685c7ad6ce74ed8ab76`. | Candidate `DROP`: legacy code and API. It is q/r integer coordinates with six-neighbor and hex-distance semantics, not the canonical embodied 3D contract. A future discrete experimental index would require independent justification and a new implementation; no mechanical conversion or compatibility API. |
+| `TerrainFieldState` (derived from `DynamicGeography` field initialization/accessors; no source class with this name) | `environment/src/environment/terrain.py`; source SHA `80d372a186513035f85a769db886e505cabba52d`; path commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`; blob `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2`. | `src/environment/terrain.py`, target commit `b22c88f9f44b6ba41b451529beac1be259fc2770`; target blob `f50b1eed8028535e621bf357fec49cf8be9136aa`. | Candidate `REWRITE`: only the broad Environment-owned field/condition capability if justified; candidate `DROP`: the copied class, finite q/r dimensions, seed phase/formulas, and untyped scalar API. Existing tests prove deterministic implementation properties, not scientific or physical validity. Any new capability must define its spatial meaning and units. |
+| `initialize_surface_water` (source `DynamicGeography._initialize_surface_water`) | `environment/src/environment/terrain.py`; source SHA `80d372a186513035f85a769db886e505cabba52d`; introduced by `4070a81173a90c5f01dbf9db046b3c1ceb7fe9c0`, moved by `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`; blob `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2`. | `src/environment/surface_water.py`, target commit `9b3affaddee18e683b54bf5f5be796aba145ee8c`; blob `14b33334a997152d20b7a072130474a4125da7cb`. | Candidate `DROP`: this implementation; any future capability requires independent justification. It uses finite HexCoord maps and uncalibrated scalar fields/cutoff/clamp/rounding without physical water units or an independently affirmed need. Any later water initialization needs separately justified Environment state/semantics and a new implementation. |
+| `advance_surface_water` (source `DynamicGeography.step()` surface-water transition) | `environment/src/environment/terrain.py`; source SHA `80d372a186513035f85a769db886e505cabba52d`; path commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`; blob `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2`. | `src/environment/hydrology.py`, target commit `fb44cf4c0cff793ca1c64a3a54d5d74a6a3991d0`; blob `3c8d4d025ee3877275d28270177feb8f279f4a34`. | Candidate `DROP`: this transition. Legacy coefficients/defaults, neighborhood flow, sparse cutoffs and rounding do not establish hydrological validity, units, physical timestep, conservation, or solver/World adoption. A future hydrology capability needs separate semantic/physical and scientific justification and a new implementation. |
+| `GroundTruth` | `src/symbiont_world/genesis.py` (at the pinned revision, moved to `environment/src/environment/genesis.py`); source SHA `80d372a186513035f85a769db886e505cabba52d`; initial source `7d043253e9e855674fbe363cd17184bd42be8ef4`, regional additions `0dc2df5f480da245b37c10b41eed11e832c7fbee` and `b9dda68d8329339eb402b9349d54ebcc92dd3268`, moved by `13720935595fedabec2c376dc933629b0deae5aa`; tick exposure at `b61eefbe3a09d2da29dc8eb3f69c2fb9f4ed5f5f`; blob `34d90b1b33c1434d6b21164c9ceced08603d2271`. | `src/environment/genesis.py`, target extraction commit `7c0efdb7264596aff5a43b0fe2041dd81aa53c02`; blob `1f9876b635b861fc097a787fa5fddab357d01846` at target `main` head `45fd868957e69c6cfd66a685c7ad6ce74ed8ab76`. | Candidate `REWRITE`: representation and contract. Preserve only independently justified Environment ownership of external laws/genesis. Do not preserve `region_of(HexCoord)`, regional resource/hazard table shapes, numeric conventions, or require a global `GroundTruth` label/API. |
+| `EnvironmentState` | Same source path, pinned SHA and blob as `GroundTruth`; legacy mutable state originated with `7d043253e9e855674fbe363cd17184bd42be8ef4`, moved by `13720935595fedabec2c376dc933629b0deae5aa`, with later revision `b61eefbe3a09d2da29dc8eb3f69c2fb9f4ed5f5f`. | `src/environment/genesis.py`, checkpoint implementation target commit `eb55c1c703cbf770216733da51a7604279338cba`; blob `1f9876b635b861fc097a787fa5fddab357d01846` at target `main` head `45fd868957e69c6cfd66a685c7ad6ce74ed8ab76`. | Candidate `REWRITE`: implementation, API and checkpoint format. Environment owns its state and supplies owner checkpoint references; the World commit contract requires those references to be durably identifiable and recoverable before commit. HexCoord-keyed pools and v1 checkpoint bytes are not retained. Preserve owner adoption/recovery semantics as contract, not old serialization compatibility. Workspace consumers are `tests/integration/test_first_biopeia_causal_tick.py` and `test_durable_checkpoint_restore_slice.py`; retarget their assertions to replacement semantics. |
+
+## Removal sequence and current gap
+
+The target package tests/dependencies to account for are
+`tests/unit/test_terrain.py`, `tests/unit/test_surface_water.py`,
+`tests/test_hydrology.py`, `tests/unit/test_genesis.py`,
+`tests/unit/test_genesis_regional.py`, and
+`tests/test_environment_checkpoint.py`, plus exports in
+`src/environment/__init__.py`. Workspace fixtures consume genesis/state in
+`tests/integration/test_first_biopeia_causal_tick.py` and
+`test_durable_checkpoint_restore_slice.py`. These consumers do not authorize
+keeping the legacy APIs.
+
+Historical behavior tests in the source monorepo include
+`lab/tests/unit/lab/world/test_terrain_and_movement.py`; they document source
+behavior but do not validate physical or scientific adequacy of the copied
+formulae.
+
+A candidate sequence for this family is to establish any justified
+Environment-owned genesis/state and checkpoint contract against current World
+owner-recovery contracts, retarget workspace causal/recovery fixtures, and
+then decide the fate of the HexCoord, field-generation and water/hydrology
+implementations, exports and legacy-specific target tests. This is a proposal,
+not a closed removal plan: the broader symbol-by-symbol source inventory and
+final dispositions remain open. Until reviewed and resolved, the current
+hex-bound target code is a migration gap, not an approved final state. Tests
+retained after replacement must exercise the new contract, not act as
+historical compatibility tests.
