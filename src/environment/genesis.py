@@ -9,6 +9,8 @@ strings and generic numeric laws ever reach this module -- no domain names.
 
 from __future__ import annotations
 
+import json
+import math
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Callable, Mapping
@@ -195,6 +197,145 @@ class EnvironmentState:
             "field_values": dict(self._field_values),
             "resource_pools": {cell: dict(pool) for cell, pool in self._resource_pools.items()},
         }
+
+    def checkpoint_bytes(self) -> bytes:
+        """Return a deterministic checkpoint of mutable Environment-owned state.
+
+        ``GroundTruth`` is configuration supplied by its owner and is not copied
+        into this payload. The caller supplies that configuration at restore;
+        stored field values are checked against its laws at the saved causal tick.
+        This payload does not identify or validate all GroundTruth dependencies.
+        """
+        snapshot = self.snapshot()
+        payload = {
+            "schema": "biopeia.environment-state",
+            "schema_version": 1,
+            "tick": snapshot["tick"],
+            "field_values": dict(sorted(snapshot["field_values"].items())),
+            "resource_pools": [
+                {
+                    "q": cell.q,
+                    "r": cell.r,
+                    "resources": dict(sorted(pool.items())),
+                }
+                for cell, pool in sorted(
+                    snapshot["resource_pools"].items(),
+                    key=lambda item: (item[0].q, item[0].r),
+                )
+            ],
+        }
+        encoded = json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+        return (encoded + "\n").encode("utf-8")
+
+    @classmethod
+    def from_checkpoint_bytes(
+        cls, ground_truth: GroundTruth, payload: bytes
+    ) -> "EnvironmentState":
+        """Restore mutable state against caller-supplied Environment configuration.
+
+        The payload validates its field projection against the supplied laws, but
+        does not prove full configuration identity (for example, resource,
+        hazard, or regional-law equivalence).
+        """
+        try:
+            document = json.loads(payload)
+            if not isinstance(document, dict) or set(document) != {
+                "schema",
+                "schema_version",
+                "tick",
+                "field_values",
+                "resource_pools",
+            }:
+                raise ValueError("invalid Environment checkpoint shape")
+            if (
+                document["schema"] != "biopeia.environment-state"
+                or document["schema_version"] != 1
+            ):
+                raise ValueError("unsupported Environment checkpoint schema")
+            tick = document["tick"]
+            fields = document["field_values"]
+            pools = document["resource_pools"]
+            if (
+                type(tick) is not int
+                or tick < 0
+                or not isinstance(fields, dict)
+                or not isinstance(pools, list)
+            ):
+                raise ValueError("invalid Environment checkpoint values")
+            field_ids = set(fields)
+            if field_ids not in (set(), set(ground_truth.fields)):
+                raise ValueError(
+                    "checkpoint fields do not match supplied GroundTruth"
+                )
+            normalized_fields: dict[str, float] = {}
+            for field_id, value in fields.items():
+                if (
+                    not isinstance(field_id, str)
+                    or isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                ):
+                    raise ValueError("invalid Environment field checkpoint")
+                value = float(value)
+                if (
+                    not math.isfinite(value)
+                    or value != ground_truth.fields[field_id].value_at(tick)
+                ):
+                    raise ValueError(
+                        "checkpoint field projection does not match GroundTruth and tick"
+                    )
+                normalized_fields[field_id] = value
+
+            resource_pools: dict[HexCoord, dict[str, float]] = {}
+            for entry in pools:
+                if not isinstance(entry, dict) or set(entry) != {
+                    "q",
+                    "r",
+                    "resources",
+                }:
+                    raise ValueError("invalid Environment resource pool checkpoint")
+                q, r, resources = entry["q"], entry["r"], entry["resources"]
+                if (
+                    type(q) is not int
+                    or type(r) is not int
+                    or not isinstance(resources, dict)
+                ):
+                    raise ValueError("invalid Environment resource pool checkpoint")
+                cell = HexCoord(q, r)
+                if cell in resource_pools:
+                    raise ValueError("duplicate Environment resource pool coordinate")
+                normalized_pool: dict[str, float] = {}
+                for resource_id, value in resources.items():
+                    if (
+                        not isinstance(resource_id, str)
+                        or isinstance(value, bool)
+                        or not isinstance(value, (int, float))
+                    ):
+                        raise ValueError("invalid Environment resource checkpoint")
+                    value = float(value)
+                    if not math.isfinite(value) or value < 0:
+                        raise ValueError("invalid Environment resource quantity")
+                    normalized_pool[resource_id] = value
+                resource_pools[cell] = normalized_pool
+
+            state = cls(ground_truth)
+            state.restore(
+                {
+                    "tick": tick,
+                    "field_values": normalized_fields,
+                    "resource_pools": resource_pools,
+                }
+            )
+            return state
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            OverflowError,
+            TypeError,
+            KeyError,
+        ) as exc:
+            raise ValueError("malformed Environment checkpoint") from exc
 
     def restore(self, snap: Mapping[str, Any]) -> None:
         """Restore internal mutable state from a snapshot."""
