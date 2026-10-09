@@ -6,6 +6,7 @@ from environment.hydrology import advance_surface_water
 from environment.laws import HazardLaw, PeriodicFieldLaw, ResourceLaw
 from environment.physical import PhysicalSphere, project_resource_geometry
 from environment.static_scene import (
+    FrameDescriptor,
     PhysicalStepCorrelation,
     StaticEnvironmentOwner,
     StaticGroundPlane,
@@ -22,6 +23,7 @@ __all__ = [
     "EnvironmentState",
     "advance_surface_water",
     "FiniteResourceState",
+    "FrameDescriptor",
     "IdentifiedFiniteResource",
     "GroundTruth",
     "HazardLaw",

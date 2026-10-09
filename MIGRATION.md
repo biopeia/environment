@@ -199,3 +199,19 @@ adoption against Environment identity/revision and strictly sequential causal
 ticks, and provides deterministic owner-bound checkpoint bytes. This is not a
 solver contract, general scene schema, World runtime, HexCoord conversion, or
 backward-compatibility layer. No legacy source symbol is claimed as its source.
+
+## Current discrete spatial implementation: noncanonical / deferred
+
+The target package still contains the historical discrete spatial family; it
+is not the canonical embodied Environment path and is not used by the new
+static 3D projection. Current code inspection found `HexCoord` imported by
+`genesis.py`, `terrain.py`, `hydrology.py`, and `surface_water.py`; these types
+are exercised by Environment unit tests. `src/environment/__init__.py` currently
+exports both `HexCoord` and `TerrainFieldState`. `TerrainFieldState` is defined
+in `terrain.py` and its tests still consume it through the package export.
+Disposition for this remaining discrete family is `DEFER` pending an explicit
+consumer/source inventory and decisions to retain only as a historical or
+scientific fixture, rewrite, or drop. It is not a promise of backward
+compatibility, a 3D adapter, or authority for the canonical embodied route.
+This bounded PR does not broadly delete it because the surveyed package has
+active internal/test consumers; no new API here depends on or adapts it.
