@@ -49,6 +49,15 @@
    monolith already exposed a pure projection API. It evaluates the existing
    `GroundTruth` laws without changing Environment state or consulting host
    time, allowing World to request values for a proposed causal transition.
+6. Added deterministic `EnvironmentState.checkpoint_bytes()` and
+   `from_checkpoint_bytes(...)` for Environment-owned mutable state. The payload
+   records the causal tick, field projection, and resource pools; it does not
+   serialize `GroundTruth`. Restore uses caller-supplied configuration and
+   checks the stored field projection against its laws, but does not verify full
+   configuration identity (including resource, hazard, or regional laws). The
+   immutable configuration identity/reference and cross-authority publication
+   remain the responsibility of World integration; this API alone is not a
+   durable World checkpoint or a crash-recovery guarantee.
 
 ## Validation scope
 
