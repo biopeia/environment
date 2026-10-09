@@ -403,3 +403,5 @@ resource semantics, establish scientific adequacy, or prove cross-version
 equivalence. Explicit/static fixtures remain supported. A changed algorithm
 must use a new generator revision; the current implementation rejects unknown
 identity/revision pairs rather than silently applying another algorithm.
+The generated scene does not persist a copy or hash of the full genesis spec;
+reproduction therefore requires the caller to retain that complete spec.
