@@ -17,6 +17,7 @@
 | `src/environment/genesis.py` | `environment/src/environment/genesis.py` | SPLIT | Retains `GroundTruth` and environmental field/resource runtime state. `WorldEnvironment` was renamed `EnvironmentState`; import of coordinate type now points to the extracted value object. |
 | `src/environment/spatial.py` | `environment/src/environment/topology.py` (`HexCoord` only) | SPLIT | Contains only the coordinate value object needed to index spatial environment state. Placement, occupancy, grid bounds, and move resolution are not copied. |
 | `src/environment/resource.py` | `environment/src/environment/physics3d/resource.py` (finite source state only) | SPLIT | Extracts the environment-owned position/radii, scalar field, finite quantity, bounded offer/accepted-consumption, and v1 checkpoint payload as `FiniteResourceState`. PhysicsScene geometry/contact detection and runtime/Organism wiring are excluded. |
+| `src/environment/physical.py` | `environment/src/environment/physics3d/resource.py::PhysicalResource` geometry | REWRITE | Requires an explicit `FrameDescriptor` and caller-declared `meters_per_resource_unit`; emits center/radius in metres without transforming out of that frame. This is configured scaling, not calibration evidence. No old API compatibility is retained. |
 | `src/environment/__init__.py` | Source package exports | REWRITE | Explicit minimal Environment-only public surface; no exports for World or Observation responsibilities. |
 | `tests/unit/test_laws.py` | `environment/tests/unit/world/test_laws.py` | MOVE | Focused law tests. |
 | `tests/unit/test_genesis.py` | `environment/tests/unit/world/test_genesis.py` | SPLIT | Focused environmental-state coverage; import updated to `EnvironmentState` and `HexCoord`. |
@@ -93,20 +94,26 @@
    owner-aligned environmental state candidate, not evidence that the old
    DynamicGeography path should be retained wholesale.
 
-9. Added `PhysicalSphere` and `project_resource_geometry(...)` as a `REWRITE`
-   of the Environment-owned geometry projection boundary, derived from
+9. Rewrote `PhysicalSphere` and `project_resource_geometry(...)` as an explicit
+   Environment-owned geometry projection boundary, derived from
    `environment/src/environment/physics3d/resource.py::PhysicalResource` at
-   source SHA `80d372a186513035f85a769db886e505cabba52d`. The projection copies
-   only the source-owned center and physical radius into an immutable,
-   engine-neutral value. `field_radius` is a scalar influence radius, not a
-   collider; quantity and transfer limits are not geometry. The source exposes
-   no unit or frame on `PhysicalResource`, so the projection deliberately does
-   not assign either and is not sufficient by itself to configure a solver.
-   `environment/physics3d/environments.py` documents metres and Z-up for its
-   versioned recipes, but that does not establish those semantics for every
-   `PhysicalResource` instance. Contact material, solver construction,
+   source SHA `80d372a186513035f85a769db886e505cabba52d`. The source exposes no
+   physical unit or frame on `PhysicalResource`, so callers must now provide a
+   valid `FrameDescriptor` and positive finite `meters_per_resource_unit`.
+   The projection emits `center_m` and `radius_m`, records the scale used, and
+   leaves coordinates local to the declared frame; it does not transform them
+   into the parent frame. Source positions, physical radius, and scalar
+   `field_radius` share relative length units, but only position and physical
+   radius are projected (`field_radius` is not a collider). The supplied scale
+   is explicit runtime configuration, not calibration, scientific evidence,
+   or a claim of physical equivalence; material quantity and transfer-limit
+   units remain unresolved. No compatibility API preserves the old unitless
+   projection. `environment/physics3d/environments.py` documents metres and
+   Z-up for its versioned recipes, but that does not establish those semantics
+   for every resource instance. Contact material, solver construction,
    coupling, and accepted state transitions remain outside Environment. This
-   is a partial physical projection only, not completion of Objective §14.
+   remains a partial physical projection only, not completion of Objective
+   §14.
 
 10. Split three pure field equations from `DynamicGeography` into
    `src/environment/ecology.py`. Provenance: pinned source
