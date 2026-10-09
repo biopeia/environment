@@ -166,3 +166,19 @@ other ecological decays, checkpointing, or scientific calibration. This is
 non-overlapping with the surface-water initialization-only candidate (#7),
 the pure effective-field equations (#9), and physical geometry projection
 (#8). The source monorepo remains unchanged.
+
+## Additional slice: sparse ecological-field decay equations
+
+| Source element | Disposition | Target path | Provenance / boundary |
+| --- | --- | --- | --- |
+| `DynamicGeography.step()` sparse trace, disturbance, detritus, and ecological-pressure decays, source lines 392–420 | SPLIT | `src/environment/ecology.py::decay_traces`, `decay_disturbance`, `decay_detritus`, `decay_ecological_pressure` | Source repository SHA `80d372a186513035f85a769db886e505cabba52d`; `environment/src/environment/terrain.py`, blob `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2`, path commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`. |
+| Source qualitative trace and pressure tests | REWRITE | `tests/unit/test_ecology.py::test_sparse_decay_preserves_threshold_rounding_and_input` | Source test file `lab/tests/unit/lab/world/test_terrain_and_movement.py`, blob `7f72c92bdd27522de8de0e8b0f322daf0a5a646a`; source tests `test_traces_deposit_and_decay` and `test_dynamic_ecology_presence_creates_pressure_and_then_decays` assert qualitative behavior rather than exact sparse cutoffs. |
+
+The four functions retain the source multipliers (`0.94`, `0.88`, `0.985`,
+`0.92`), sparse retention thresholds (`0.005`, `0.005`, `0.002`, `0.002`),
+threshold-before-rounding order, and four-decimal rounding. Each returns a new
+mapping and does not mutate its input. This extracts only pure value-map
+equations. Tick ordering, occupancy/death interpretation and deposition,
+active-cell selection, topology traversal, World state, and persistence remain
+caller-owned and are not migrated. These are preserved current software rules,
+not claims of scientific validity or calibration.

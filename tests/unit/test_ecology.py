@@ -1,10 +1,41 @@
+import math
+
 import pytest
 
 from environment.ecology import (
+    decay_detritus,
+    decay_disturbance,
+    decay_ecological_pressure,
+    decay_traces,
     effective_fertility,
     effective_permeability,
     resource_renewal_factor,
 )
+
+
+@pytest.mark.parametrize(
+    "decay, multiplier, threshold",
+    [
+        (decay_traces, 0.94, 0.005),
+        (decay_disturbance, 0.88, 0.005),
+        (decay_detritus, 0.985, 0.002),
+        (decay_ecological_pressure, 0.92, 0.002),
+    ],
+)
+def test_sparse_decay_preserves_threshold_rounding_and_input(decay, multiplier, threshold):
+    at_threshold = threshold / multiplier
+    below_threshold = math.nextafter(at_threshold, 0.0)
+    field = {"kept": 0.123456, "threshold": at_threshold, "dropped": below_threshold}
+    original = field.copy()
+
+    result = decay(field)
+
+    assert result == {
+        "kept": round(0.123456 * multiplier, 4),
+        "threshold": threshold,
+    }
+    assert field == original
+    assert result is not field
 
 
 def test_effective_fertility_preserves_source_contributions_and_clamp():
