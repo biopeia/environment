@@ -1,4 +1,5 @@
 from dataclasses import replace
+import json
 
 import pytest
 
@@ -9,6 +10,7 @@ from environment import (
     EnvironmentGenesisSpec,
     FrameDescriptor,
     StaticGroundPlane,
+    StaticEnvironmentOwner,
     generate_procedural_environment,
 )
 
@@ -52,22 +54,60 @@ def test_same_complete_spec_generates_same_scene_and_explicit_provenance():
     second = generate_procedural_environment(spec)
 
     assert first == second
-    assert first.generator_id == GENERATOR_ID
-    assert first.generator_revision == GENERATOR_REVISION
-    assert first.environment_seed == 42
-    assert len(first.objects) == 12
+    assert first.scene.genesis.generator_id == GENERATOR_ID
+    assert first.scene.genesis.generator_revision == GENERATOR_REVISION
+    assert first.scene.genesis.environment_seed == 42
+    assert len(first.scene.spheres) == 12
     assert first.scene.frame == spec.configuration.frame
     assert first.scene.gravity_m_s2 == (0.0, 0.0, -9.81)
     assert first.scene.objects == (spec.configuration.ground_plane,)
-    assert {sphere.object_id for sphere in first.objects} == {
+    assert {sphere.object_id for sphere in first.scene.spheres} == {
         f"sphere-{index:06d}" for index in range(12)
     }
-    for sphere in first.objects:
+    assert first.scene.genesis.configuration["sphere_count"] == 12
+    for sphere in first.scene.spheres:
         assert sphere.frame_id == "env-frame"
         assert all(-2.0 <= coordinate <= 2.0 for coordinate in sphere.center_m[:1])
         assert -1.0 <= sphere.center_m[1] <= 1.0
         assert 0.0 <= sphere.center_m[2] <= 3.0
         assert 0.05 <= sphere.radius_m <= 0.25
+
+
+def test_generated_geometry_is_scene_authority_and_checkpoint_restores_it():
+    generated = generate_procedural_environment(_spec())
+    owner = StaticEnvironmentOwner(generated.scene, "environment-owner")
+    restored = StaticEnvironmentOwner.from_checkpoint_bytes(owner.checkpoint_bytes())
+
+    assert restored.scene.spheres == generated.scene.spheres
+    assert restored.scene.genesis == generated.scene.genesis
+    assert restored.scene.genesis.configuration["sphere_count"] == 12
+    assert restored.checkpoint_bytes() == owner.checkpoint_bytes()
+
+
+def test_checkpoint_keeps_generator_configuration_structured_and_opaque_on_restore():
+    owner = StaticEnvironmentOwner(generate_procedural_environment(_spec()).scene, "environment-owner")
+    payload = json.loads(owner.checkpoint_bytes())
+    payload["scene"]["genesis"]["configuration"]["future_generator_input"] = {"mode": "opaque"}
+
+    restored = StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
+
+    assert restored.scene.genesis.configuration["future_generator_input"] == {"mode": "opaque"}
+    assert json.loads(restored.checkpoint_bytes())["scene"]["genesis"]["configuration"]["future_generator_input"] == {
+        "mode": "opaque"
+    }
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda provenance: provenance.__setitem__("unexpected", "field"),
+    lambda provenance: provenance.__setitem__("configuration", []),
+])
+def test_checkpoint_rejects_malformed_genesis_provenance_shape(mutate):
+    owner = StaticEnvironmentOwner(generate_procedural_environment(_spec()).scene, "environment-owner")
+    payload = json.loads(owner.checkpoint_bytes())
+    mutate(payload["scene"]["genesis"])
+
+    with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
+        StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
 
 
 def test_seed_and_configuration_are_causal_generator_inputs():
@@ -80,7 +120,7 @@ def test_seed_and_configuration_are_causal_generator_inputs():
 
     assert baseline != other_seed
     assert baseline != other_config
-    assert len(other_config.objects) == 13
+    assert len(other_config.scene.spheres) == 13
 
 
 @pytest.mark.parametrize(

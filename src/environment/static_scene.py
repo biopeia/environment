@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,7 +24,10 @@ def _vector3(value: tuple[float, float, float], name: str) -> tuple[float, float
     if isinstance(value, (str, bytes)):
         raise ValueError(f"{name} must contain three finite values")
     try:
-        result = tuple(float(component) for component in value)
+        components = tuple(value)
+        if any(isinstance(component, bool) for component in components):
+            raise ValueError(f"{name} must contain three finite values")
+        result = tuple(float(component) for component in components)
     except (TypeError, ValueError, OverflowError) as error:
         raise ValueError(f"{name} must contain three finite values") from error
     if len(result) != 3 or not all(math.isfinite(component) for component in result):
@@ -87,6 +91,79 @@ class StaticGroundPlane:
 
 
 @dataclass(frozen=True, slots=True)
+class StaticSphere:
+    """Environment-owned static sphere geometry in metres in a named frame."""
+
+    object_id: str
+    center_m: tuple[float, float, float]
+    radius_m: float
+    frame_id: str
+
+    def __post_init__(self) -> None:
+        _identity(self.object_id, "object_id")
+        _identity(self.frame_id, "frame_id")
+        center = _vector3(self.center_m, "center_m")
+        object.__setattr__(self, "center_m", center)
+        if isinstance(self.radius_m, bool):
+            raise ValueError("radius_m must be finite and positive")
+        try:
+            radius = float(self.radius_m)
+        except (TypeError, ValueError, OverflowError) as error:
+            raise ValueError("radius_m must be finite and positive") from error
+        if not math.isfinite(radius) or radius <= 0:
+            raise ValueError("radius_m must be finite and positive")
+        object.__setattr__(self, "radius_m", radius)
+
+
+@dataclass(frozen=True, slots=True)
+class EnvironmentGenesisProvenance:
+    """Explicit generator inputs; configuration is opaque to checkpoint restore.
+
+    The configuration is stored internally as canonical JSON to keep this value
+    immutable. Checkpoint encoding exposes it as a structured JSON object.
+    """
+
+    environment_seed: int
+    generator_id: str
+    generator_revision: str
+    configuration_json: str
+
+    def __post_init__(self) -> None:
+        if isinstance(self.environment_seed, bool) or not isinstance(self.environment_seed, int):
+            raise ValueError("environment_seed must be an integer")
+        _identity(self.generator_id, "generator_id")
+        _identity(self.generator_revision, "generator_revision")
+        if not isinstance(self.configuration_json, str):
+            raise ValueError("configuration must be a JSON object")
+        try:
+            value = json.loads(self.configuration_json)
+        except (json.JSONDecodeError, TypeError) as error:
+            raise ValueError("configuration must be a JSON object") from error
+        if not isinstance(value, dict):
+            raise ValueError("configuration must be a JSON object")
+        canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        object.__setattr__(self, "configuration_json", canonical)
+
+    @classmethod
+    def from_configuration(
+        cls, *, environment_seed: int, generator_id: str, generator_revision: str,
+        configuration: Mapping[str, Any],
+    ) -> EnvironmentGenesisProvenance:
+        if not isinstance(configuration, Mapping):
+            raise ValueError("configuration must be a JSON object")
+        try:
+            encoded = json.dumps(dict(configuration), sort_keys=True, separators=(",", ":"), allow_nan=False)
+        except (TypeError, ValueError) as error:
+            raise ValueError("configuration must be a JSON object") from error
+        return cls(environment_seed, generator_id, generator_revision, encoded)
+
+    @property
+    def configuration(self) -> dict[str, Any]:
+        """Return a detached object representation of generator configuration."""
+        return json.loads(self.configuration_json)
+
+
+@dataclass(frozen=True, slots=True)
 class FrameDescriptor:
     """Explicit right-handed frame, with its basis expressed in a parent frame.
 
@@ -141,6 +218,8 @@ class StaticPhysicalScene:
     frame: FrameDescriptor
     gravity_m_s2: tuple[float, float, float]
     objects: tuple[StaticGroundPlane, ...]
+    spheres: tuple[StaticSphere, ...] = ()
+    genesis: EnvironmentGenesisProvenance | None = None
 
     def __post_init__(self) -> None:
         for field in ("environment_id", "environment_revision"):
@@ -151,10 +230,18 @@ class StaticPhysicalScene:
         objects = tuple(self.objects)
         if not all(isinstance(item, StaticGroundPlane) for item in objects):
             raise ValueError("objects must contain StaticGroundPlane values")
-        ids = [item.object_id for item in objects]
+        spheres = tuple(self.spheres)
+        if not all(isinstance(item, StaticSphere) for item in spheres):
+            raise ValueError("spheres must contain StaticSphere values")
+        if any(item.frame_id != self.frame.frame_id for item in spheres):
+            raise ValueError("sphere frame_id must match the scene frame")
+        if self.genesis is not None and not isinstance(self.genesis, EnvironmentGenesisProvenance):
+            raise ValueError("genesis must be EnvironmentGenesisProvenance or None")
+        ids = [item.object_id for item in (*objects, *spheres)]
         if len(set(ids)) != len(ids):
             raise ValueError("object_id values must be unique within the scene")
         object.__setattr__(self, "objects", objects)
+        object.__setattr__(self, "spheres", spheres)
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,14 +263,16 @@ def project_static_scene(scene: StaticPhysicalScene) -> StaticPhysicalScene:
         frame=scene.frame,
         gravity_m_s2=scene.gravity_m_s2,
         objects=tuple(sorted(scene.objects, key=lambda item: item.object_id)),
+        spheres=tuple(sorted(scene.spheres, key=lambda item: item.object_id)),
+        genesis=scene.genesis,
     )
 
 
 class StaticEnvironmentOwner:
     """Small owner boundary for a static scene and its recoverable step marker."""
 
-    SCHEMA_VERSION = 2
-    CHECKPOINT_SCHEMA = "environment-static-scene-v2"
+    SCHEMA_VERSION = 3
+    CHECKPOINT_SCHEMA = "environment-static-scene-v3"
 
     def __init__(self, scene: StaticPhysicalScene, owner_id: str) -> None:
         self._scene = project_static_scene(scene)
@@ -259,6 +348,17 @@ class StaticEnvironmentOwner:
                     {"object_id": item.object_id, "normal": list(item.normal), "offset_m": item.offset_m}
                     for item in self._scene.objects
                 ],
+                "spheres": [
+                    {"object_id": item.object_id, "center_m": list(item.center_m),
+                     "radius_m": item.radius_m, "frame_id": item.frame_id}
+                    for item in self._scene.spheres
+                ],
+                "genesis": None if self._scene.genesis is None else {
+                    "environment_seed": self._scene.genesis.environment_seed,
+                    "generator_id": self._scene.genesis.generator_id,
+                    "generator_revision": self._scene.genesis.generator_revision,
+                    "configuration": self._scene.genesis.configuration,
+                },
             },
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
@@ -277,7 +377,8 @@ class StaticEnvironmentOwner:
                 raise ValueError("unsupported static Environment checkpoint schema")
             scene_data = payload["scene"]
             if not isinstance(scene_data, dict) or set(scene_data) != {
-                "environment_id", "environment_revision", "frame", "gravity_m_s2", "objects"
+                "environment_id", "environment_revision", "frame", "gravity_m_s2",
+                "objects", "spheres", "genesis",
             }:
                 raise ValueError("invalid scene checkpoint fields")
             frame_data = scene_data["frame"]
@@ -292,6 +393,22 @@ class StaticEnvironmentOwner:
                 for item in raw_objects
             ):
                 raise ValueError("invalid object checkpoint fields")
+            raw_spheres = scene_data["spheres"]
+            if not isinstance(raw_spheres, list) or any(
+                not isinstance(item, dict)
+                or set(item) != {"object_id", "center_m", "radius_m", "frame_id"}
+                for item in raw_spheres
+            ):
+                raise ValueError("invalid sphere checkpoint fields")
+            raw_genesis = scene_data["genesis"]
+            if raw_genesis is not None and (
+                not isinstance(raw_genesis, dict)
+                or set(raw_genesis) != {
+                    "environment_seed", "generator_id", "generator_revision", "configuration"
+                }
+                or not isinstance(raw_genesis.get("configuration"), dict)
+            ):
+                raise ValueError("invalid genesis checkpoint fields")
             frame = FrameDescriptor(
                 frame_id=frame_data["frame_id"],
                 parent_frame_id=frame_data["parent_frame_id"],
@@ -308,6 +425,13 @@ class StaticEnvironmentOwner:
                 frame=frame,
                 gravity_m_s2=tuple(scene_data["gravity_m_s2"]),
                 objects=tuple(StaticGroundPlane(**item) for item in raw_objects),
+                spheres=tuple(StaticSphere(**item) for item in raw_spheres),
+                genesis=None if raw_genesis is None else EnvironmentGenesisProvenance.from_configuration(
+                    environment_seed=raw_genesis["environment_seed"],
+                    generator_id=raw_genesis["generator_id"],
+                    generator_revision=raw_genesis["generator_revision"],
+                    configuration=raw_genesis["configuration"],
+                ),
             )
             raw_correlation = payload["last_accepted_correlation"]
             if raw_correlation is not None and (
@@ -344,6 +468,6 @@ class StaticEnvironmentOwner:
 
 
 __all__ = [
-    "FrameDescriptor", "PhysicalStepCorrelation", "StaticEnvironmentOwner", "StaticGroundPlane",
+    "EnvironmentGenesisProvenance", "FrameDescriptor", "PhysicalStepCorrelation", "StaticEnvironmentOwner", "StaticGroundPlane", "StaticSphere",
     "StaticPhysicalScene", "StaticSceneCandidate", "project_static_scene",
 ]

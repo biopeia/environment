@@ -509,3 +509,21 @@ forward acceptance. This policy follows the Architecture Owner's Biopeia
 migration ratification of 2026-10-09 (closed Environment checkpoint schema;
 reject unknown fields); it is not a compatibility promise for historical
 source payloads.
+
+### Static sphere scene and checkpoint v3
+
+The bounded static physical-scene capability now owns sphere geometry through
+`StaticPhysicalScene.spheres`; generated spheres are no longer a parallel
+sidecar result. Each sphere has a stable object ID, frame ID, center in metres,
+and radius in metres. This is a fixture-level geometry representation, not a
+universal Environment scene contract, solver contract, or claim about materials,
+mass, dynamics, or scientific suitability.
+
+Procedural scene genesis records the explicit seed, generator identity and
+revision, plus the generator-specific configuration as provenance. The v3
+owner checkpoint persists both this provenance and the authoritative geometry;
+restore uses the stored geometry and does not rerun a generator. The closed v3
+decoder rejects v2 checkpoints and unknown envelope/geometry fields; no v2
+compatibility decoder is provided. Provenance configuration is an opaque JSON
+object to checkpoint restoration and is not validated against the current
+generator implementation.

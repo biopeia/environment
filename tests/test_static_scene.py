@@ -10,11 +10,12 @@ from environment.static_scene import (
     StaticGroundPlane,
     StaticPhysicalScene,
     StaticSceneCandidate,
+    StaticSphere,
     project_static_scene,
 )
 
 
-def scene(objects=None):
+def scene(objects=None, spheres=()):
     return StaticPhysicalScene(
         environment_id="environment-1",
         environment_revision="rev-3",
@@ -30,6 +31,7 @@ def scene(objects=None):
         ),
         gravity_m_s2=(0.0, 0.0, -9.80665),
         objects=tuple(objects if objects is not None else (StaticGroundPlane("ground", (0, 0, 1)),)),
+        spheres=tuple(spheres),
     )
 
 
@@ -46,6 +48,13 @@ def test_projection_is_pure_and_collection_order_invariant():
     assert first.objects == objects
 
 
+def test_projection_canonicalizes_sphere_order_by_stable_identity():
+    left = StaticSphere("z", (0, 0, 1), 0.2, "environment-frame")
+    right = StaticSphere("a", (1, 0, 0), 0.1, "environment-frame")
+    projected = project_static_scene(scene(spheres=(left, right)))
+    assert tuple(sphere.object_id for sphere in projected.spheres) == ("a", "z")
+
+
 def test_requires_explicit_sane_frame_units_and_stable_unique_identity():
     with pytest.raises(ValueError, match="gravity_m_s2"):
         replace(scene(), gravity_m_s2=(0, 0, float("nan")))
@@ -53,6 +62,10 @@ def test_requires_explicit_sane_frame_units_and_stable_unique_identity():
         StaticGroundPlane("ground", (0, 0, 2))
     with pytest.raises(ValueError, match="unique"):
         scene((StaticGroundPlane("same", (0, 0, 1)), StaticGroundPlane("same", (1, 0, 0))))
+    with pytest.raises(ValueError, match="unique"):
+        scene(spheres=(StaticSphere("ground", (0, 0, 0), 1.0, "environment-frame"),))
+    with pytest.raises(ValueError, match="scene frame"):
+        scene(spheres=(StaticSphere("sphere", (0, 0, 0), 1.0, "other-frame"),))
     with pytest.raises(ValueError, match="right-handed"):
         FrameDescriptor(
             "bad-frame", "world", (0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, -1),
@@ -109,6 +122,14 @@ def test_owner_adopts_only_same_scene_and_next_correlation():
         owner.validate_and_adopt(
             StaticSceneCandidate(correlation(1), changed), expected_correlation=correlation(1)
         )
+    changed_geometry = replace(
+        owner.scene,
+        spheres=(StaticSphere("sphere", (1, 0, 0), 0.5, "environment-frame"),),
+    )
+    with pytest.raises(ValueError, match="rejects changed"):
+        owner.validate_and_adopt(
+            StaticSceneCandidate(correlation(1), changed_geometry), expected_correlation=correlation(1)
+        )
     assert owner.last_adopted_tick == 0
     assert owner.checkpoint_bytes() == committed_checkpoint
 
@@ -158,8 +179,9 @@ def test_checkpoint_persists_accepted_step_and_rejects_replay_after_restore():
         lambda payload: payload["scene"].__setitem__("unexpected", True),
         lambda payload: payload["scene"]["frame"].__setitem__("unexpected", True),
         lambda payload: payload["scene"]["objects"][0].__setitem__("unexpected", True),
+        lambda payload: payload["scene"].__setitem__("unexpected_spheres", []),
     ],
-    ids=("root", "scene", "frame", "object"),
+    ids=("root", "scene", "frame", "object", "scene-extra"),
 )
 def test_checkpoint_rejects_unknown_fields_at_each_scene_level(mutate):
     encoded = StaticEnvironmentOwner(scene(), "env-owner").checkpoint_bytes()
@@ -192,5 +214,48 @@ def test_checkpoint_rejects_boolean_schema_version():
     payload = json.loads(StaticEnvironmentOwner(scene(), "env-owner").checkpoint_bytes())
     payload["schema_version"] = True
 
+    with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
+        StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
+
+
+def test_checkpoint_v3_persists_spheres_and_rejects_v2_without_compatibility():
+    sphere = StaticSphere("sphere-a", (1.25, -2.0, 0.5), 0.2, "environment-frame")
+    owner = StaticEnvironmentOwner(scene(spheres=(sphere,)), "env-owner")
+    encoded = owner.checkpoint_bytes()
+    payload = json.loads(encoded)
+    assert payload["schema_version"] == 3
+    assert payload["scene"]["spheres"] == [
+        {"object_id": "sphere-a", "center_m": [1.25, -2.0, 0.5], "radius_m": 0.2,
+         "frame_id": "environment-frame"}
+    ]
+    restored = StaticEnvironmentOwner.from_checkpoint_bytes(encoded)
+    assert restored.scene.spheres == (sphere,)
+    payload["schema_version"] = 2
+    with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
+        StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
+
+
+def test_checkpoint_rejects_unknown_sphere_fields_and_invalid_sphere_geometry():
+    encoded = StaticEnvironmentOwner(
+        scene(spheres=(StaticSphere("sphere-a", (0, 0, 0), 0.25, "environment-frame"),)),
+        "env-owner",
+    ).checkpoint_bytes()
+    payload = json.loads(encoded)
+    payload["scene"]["spheres"][0]["extra"] = "not accepted"
+    with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
+        StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
+    payload = json.loads(encoded)
+    payload["scene"]["spheres"][0]["radius_m"] = float("nan")
+    with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
+        StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
+
+
+def test_checkpoint_rejects_duplicate_sphere_identity():
+    owner = StaticEnvironmentOwner(
+        scene(spheres=(StaticSphere("sphere-a", (0, 0, 0), 0.25, "environment-frame"),)),
+        "env-owner",
+    )
+    payload = json.loads(owner.checkpoint_bytes())
+    payload["scene"]["spheres"].append(payload["scene"]["spheres"][0])
     with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
         StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())

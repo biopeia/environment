@@ -12,7 +12,13 @@ import json
 import math
 from dataclasses import dataclass
 
-from environment.static_scene import FrameDescriptor, StaticGroundPlane, StaticPhysicalScene
+from environment.static_scene import (
+    EnvironmentGenesisProvenance,
+    FrameDescriptor,
+    StaticGroundPlane,
+    StaticPhysicalScene,
+    StaticSphere,
+)
 
 
 GENERATOR_ID = "biopeia.environment.sha256-sphere-layout"
@@ -29,7 +35,10 @@ def _vector3(value: tuple[float, float, float], name: str) -> tuple[float, float
     if isinstance(value, (str, bytes)):
         raise ValueError(f"{name} must contain three finite values")
     try:
-        result = tuple(float(component) for component in value)
+        components = tuple(value)
+        if any(isinstance(component, bool) for component in components):
+            raise ValueError(f"{name} must contain three finite values")
+        result = tuple(float(component) for component in components)
     except (TypeError, ValueError, OverflowError) as error:
         raise ValueError(f"{name} must contain three finite values") from error
     if len(result) != 3 or not all(math.isfinite(component) for component in result):
@@ -108,54 +117,14 @@ class EnvironmentGenesisSpec:
 
 
 @dataclass(frozen=True, slots=True)
-class GeneratedSphere:
-    """Engine-neutral physical sphere geometry in an explicit local frame."""
-
-    object_id: str
-    center_m: tuple[float, float, float]
-    radius_m: float
-    frame_id: str
-
-    def __post_init__(self) -> None:
-        _identity(self.object_id, "object_id")
-        _identity(self.frame_id, "frame_id")
-        object.__setattr__(self, "center_m", _vector3(self.center_m, "center_m"))
-        if isinstance(self.radius_m, bool):
-            raise ValueError("radius_m must be finite and positive")
-        try:
-            radius = float(self.radius_m)
-        except (TypeError, ValueError, OverflowError) as error:
-            raise ValueError("radius_m must be finite and positive") from error
-        if not math.isfinite(radius) or radius <= 0:
-            raise ValueError("radius_m must be finite and positive")
-        object.__setattr__(self, "radius_m", radius)
-
-
-@dataclass(frozen=True, slots=True)
 class ProceduralEnvironmentScene:
-    """Generated environment projection; it carries no cognitive labels."""
+    """Wrapper around generated authoritative Environment scene state."""
 
     scene: StaticPhysicalScene
-    objects: tuple[GeneratedSphere, ...]
-    generator_id: str
-    generator_revision: str
-    environment_seed: int
 
     def __post_init__(self) -> None:
         if not isinstance(self.scene, StaticPhysicalScene):
             raise ValueError("scene must be a StaticPhysicalScene")
-        _identity(self.generator_id, "generator_id")
-        _identity(self.generator_revision, "generator_revision")
-        if isinstance(self.environment_seed, bool) or not isinstance(self.environment_seed, int):
-            raise ValueError("environment_seed must be an integer")
-        objects = tuple(self.objects)
-        if not all(isinstance(item, GeneratedSphere) for item in objects):
-            raise ValueError("objects must contain GeneratedSphere values")
-        if len({item.object_id for item in objects}) != len(objects):
-            raise ValueError("generated object identities must be unique")
-        if any(item.frame_id != self.scene.frame.frame_id for item in objects):
-            raise ValueError("generated objects must use the scene frame")
-        object.__setattr__(self, "objects", objects)
 
 
 def _canonical_spec(spec: EnvironmentGenesisSpec) -> bytes:
@@ -216,27 +185,29 @@ def generate_procedural_environment(spec: EnvironmentGenesisSpec) -> ProceduralE
     config = spec.configuration
     canonical = _canonical_spec(spec)
     lower, upper = config.bounds_min_m, config.bounds_max_m
-    spheres: list[GeneratedSphere] = []
+    spheres: list[StaticSphere] = []
     for index in range(config.sphere_count):
         digest = hashlib.sha256(canonical + b"\x00object\x00" + index.to_bytes(8, "big")).digest()
         unit = tuple(_unit_interval(digest, axis) for axis in range(4))
         center = tuple(lo + (hi - lo) * unit[axis] for axis, (lo, hi) in enumerate(zip(lower, upper, strict=True)))
         radius = config.minimum_radius_m + (config.maximum_radius_m - config.minimum_radius_m) * unit[3]
-        spheres.append(GeneratedSphere(f"sphere-{index:06d}", center, radius, config.frame.frame_id))
+        spheres.append(StaticSphere(f"sphere-{index:06d}", center, radius, config.frame.frame_id))
+    genesis_configuration = json.loads(_canonical_spec(spec))["configuration"]
     scene = StaticPhysicalScene(
         environment_id=config.environment_id,
         environment_revision=config.environment_revision,
         frame=config.frame,
         gravity_m_s2=config.gravity_m_s2,
         objects=(config.ground_plane,),
+        spheres=tuple(spheres),
+        genesis=EnvironmentGenesisProvenance.from_configuration(
+            environment_seed=spec.environment_seed,
+            generator_id=spec.generator_id,
+            generator_revision=spec.generator_revision,
+            configuration=genesis_configuration,
+        ),
     )
-    return ProceduralEnvironmentScene(
-        scene=scene,
-        objects=tuple(spheres),
-        generator_id=spec.generator_id,
-        generator_revision=spec.generator_revision,
-        environment_seed=spec.environment_seed,
-    )
+    return ProceduralEnvironmentScene(scene=scene)
 
 
 __all__ = [
@@ -244,7 +215,6 @@ __all__ = [
     "GENERATOR_REVISION",
     "EnvironmentGenesisConfig",
     "EnvironmentGenesisSpec",
-    "GeneratedSphere",
     "ProceduralEnvironmentScene",
     "generate_procedural_environment",
 ]

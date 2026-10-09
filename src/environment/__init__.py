@@ -6,19 +6,20 @@ from environment.procedural_genesis import (
     GENERATOR_REVISION,
     EnvironmentGenesisConfig,
     EnvironmentGenesisSpec,
-    GeneratedSphere,
     ProceduralEnvironmentScene,
     generate_procedural_environment,
 )
 from environment.physical import PhysicalSphere, project_resource_geometry
 from environment.resource import FiniteResourceState
 from environment.static_scene import (
+    EnvironmentGenesisProvenance,
     FrameDescriptor,
     PhysicalStepCorrelation,
     StaticEnvironmentOwner,
     StaticGroundPlane,
     StaticPhysicalScene,
     StaticSceneCandidate,
+    StaticSphere,
     project_static_scene,
 )
 
@@ -26,10 +27,10 @@ __all__ = [
     "GENERATOR_ID",
     "GENERATOR_REVISION",
     "EnvironmentGenesisConfig",
+    "EnvironmentGenesisProvenance",
     "EnvironmentGenesisSpec",
     "FiniteResourceState",
     "FrameDescriptor",
-    "GeneratedSphere",
     "IdentifiedFiniteResource",
     "PhysicalSphere",
     "PhysicalStepCorrelation",
@@ -38,6 +39,7 @@ __all__ = [
     "StaticGroundPlane",
     "StaticPhysicalScene",
     "StaticSceneCandidate",
+    "StaticSphere",
     "project_resource_geometry",
     "project_static_scene",
     "generate_procedural_environment",
