@@ -21,6 +21,7 @@
 | `tests/unit/test_laws.py` | `environment/tests/unit/world/test_laws.py` | MOVE | Focused law tests. |
 | `tests/unit/test_genesis.py` | `environment/tests/unit/world/test_genesis.py` | SPLIT | Focused environmental-state coverage; import updated to `EnvironmentState` and `HexCoord`. |
 | `tests/unit/test_genesis_regional.py` | `environment/tests/unit/world/test_genesis_regional.py` | SPLIT | Focused regional environmental-law coverage; imports updated. |
+| `src/environment/ecology.py` | `environment/src/environment/terrain.py` (`DynamicGeography.effective_permeability`, `effective_fertility`, `resource_renewal_factor`) | SPLIT | Pure equations for existing ecological fields; no cell storage, topology, units, persistence, or World traversal behavior. |
 
 ## Deferred or excluded source families
 
@@ -107,6 +108,61 @@
    coupling, and accepted state transitions remain outside Environment. This
    is a partial physical projection only, not completion of Objective §14.
 
+10. Split three pure field equations from `DynamicGeography` into
+   `src/environment/ecology.py`. Provenance: pinned source
+   `environment/src/environment/terrain.py` at source SHA
+   `80d372a186513035f85a769db886e505cabba52d`, blob
+   `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2` (methods
+   `effective_permeability`, `effective_fertility`, and
+   `resource_renewal_factor`). Disposition: `SPLIT`. Coefficients, clamp
+   bounds, and the renewal floor are retained literally. This extracts only
+   calculations over caller-supplied scalar fields; it does not transfer
+   `DynamicGeography` state, establish physical units or scientific validity,
+   define input validation beyond the source behavior, or include adjacent
+   topology-dependent traversal and dynamic update rules.
+
+11. Split deterministic initial surface-water values from the mixed source
+   `DynamicGeography._initialize_surface_water`. Provenance: pinned source
+   `environment/src/environment/terrain.py` at source SHA
+   `80d372a186513035f85a769db886e505cabba52d`, introduced into that path by
+   source commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`. Disposition:
+   `SPLIT`. `initialize_surface_water` requires explicit, complete moisture,
+   elevation, and permeability mappings for every cell in the provided finite
+   rectangular dimensions. It preserves the source formula, cutoff, clamp,
+   and four-decimal rounding. It deliberately does not inherit the source
+   constructor's empty-map generation or partial-map override behavior, and it
+   does not provide implicit field defaults. The function is initialization
+   only: `DynamicGeography.step`, substrate impulses, occupant inputs,
+   persistence, World transaction state, and runtime/Lab wiring remain
+   excluded. Existing source coverage is
+   `lab/tests/unit/lab/world/test_terrain_and_movement.py::test_surface_water_is_deterministic_and_persistent_roundtrip`; it asserts
+   repeatability and serialization roundtrip, not a numeric formula oracle.
+   New target tests exercise the numeric formula, threshold, clamp, immutable
+   result, and complete-input requirement. This does not validate a scientific
+   hydrology model or claim that CURRENT runtime callers use this extracted
+   function.
+
 ## Validation scope
 
 The selected package has no first-party runtime dependency beyond the Python standard library. Validation is scoped to the copied/split laws and environmental-state unit tests. Passing tests do not establish scientific adequacy of any ecological law or complete migration of the source Environment package.
+
+## Additional slice: dynamic surface-water relaxation
+
+| Source element | Disposition | Target path | Provenance / boundary |
+| --- | --- | --- | --- |
+| `DynamicGeography.step()` surface-water transition, source lines 366–390 (equilibrium, relaxation, temperature loss, downhill-neighbor inflow, sparse threshold, rounding) and getter defaults at lines 190–200 | SPLIT / REWRITE | `src/environment/hydrology.py::advance_surface_water` | Source repository SHA `80d372a186513035f85a769db886e505cabba52d`; `environment/src/environment/terrain.py`, blob `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2`, path commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`. Source active-set construction at lines 358–365 and occupancy/death interpretation are deliberately not copied. |
+| Focused deterministic transition tests | REWRITE | `tests/test_hydrology.py` | `test_relaxes_water_toward_equilibrium_and_keeps_source_rounding`, `test_expands_active_set_by_one_neighbor_and_applies_downhill_inflow`, sparse-threshold, explicit-grid-bound, finite-input, and non-mutation assertions. |
+
+The extracted transition is a pure update over caller-supplied Environment-owned
+water/static-field maps and an explicit valid-cell set. The caller supplies the
+candidate cells that correspond to the source union of presence/death and
+active ecological state; this module does not interpret occupancy, death,
+World topology, or lifecycle. It preserves source defaults for missing static
+fields (`0.5` moisture/elevation/temperature and `0.8` permeability),
+coefficients, threshold (`0.002`), and four-decimal rounding. Unlike the mixed
+source method, it rejects input state/candidates outside the supplied grid and
+rejects non-finite field values. It does not implement substrate impulse,
+other ecological decays, checkpointing, or scientific calibration. This is
+non-overlapping with the surface-water initialization-only candidate (#7),
+the pure effective-field equations (#9), and physical geometry projection
+(#8). The source monorepo remains unchanged.
