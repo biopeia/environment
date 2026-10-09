@@ -80,15 +80,15 @@ def test_correlation_requires_nonnegative_integer_tick(tick):
 
 
 def test_owner_adopts_only_same_scene_and_next_correlation():
-    owner = StaticEnvironmentOwner(scene(), "environment-owner")
+    owner = StaticEnvironmentOwner(scene(), "environment-owner", world_id="world-1")
     checkpoint_before = owner.checkpoint_bytes()
     wrong_world = correlation(world_id="different-world")
-    with pytest.raises(ValueError, match="World-authorized"):
+    with pytest.raises(ValueError, match="candidate correlation"):
         owner.validate_and_adopt(
             StaticSceneCandidate(wrong_world, owner.scene), expected_correlation=correlation()
         )
     wrong_step = correlation(step_id="not-the-authorized-step")
-    with pytest.raises(ValueError, match="World-authorized"):
+    with pytest.raises(ValueError, match="candidate correlation"):
         owner.validate_and_adopt(
             StaticSceneCandidate(wrong_step, owner.scene), expected_correlation=correlation()
         )
@@ -103,6 +103,13 @@ def test_owner_adopts_only_same_scene_and_next_correlation():
             StaticSceneCandidate(wrong_environment, owner.scene), expected_correlation=wrong_environment
         )
     assert owner.checkpoint_bytes() == checkpoint_before
+
+    # Even a caller supplying matching candidate/expected values cannot move
+    # an attached owner to another World.
+    with pytest.raises(ValueError, match="bound World"):
+        owner.validate_and_adopt(
+            StaticSceneCandidate(wrong_world, owner.scene), expected_correlation=wrong_world
+        )
 
     owner.validate_and_adopt(
         StaticSceneCandidate(correlation(), owner.scene), expected_correlation=correlation()
@@ -135,8 +142,9 @@ def test_owner_adopts_only_same_scene_and_next_correlation():
 
 
 def test_checkpoint_is_deterministic_and_bound_to_owner_identity():
-    owner = StaticEnvironmentOwner(scene((StaticGroundPlane("z", (0, 0, 1)), StaticGroundPlane("a", (1, 0, 0)))), "env-owner")
-    reordered = StaticEnvironmentOwner(scene((StaticGroundPlane("a", (1, 0, 0)), StaticGroundPlane("z", (0, 0, 1)))), "env-owner")
+    objects = (StaticGroundPlane("z", (0, 0, 1)), StaticGroundPlane("a", (1, 0, 0)))
+    owner = StaticEnvironmentOwner(scene(objects), "env-owner", world_id="world-1")
+    reordered = StaticEnvironmentOwner(scene(reversed(objects)), "env-owner", world_id="world-1")
     assert owner.checkpoint_bytes() == reordered.checkpoint_bytes()
     assert StaticEnvironmentOwner.validate_checkpoint(
         owner.checkpoint_bytes(), "env-owner", StaticEnvironmentOwner.CHECKPOINT_SCHEMA
@@ -146,13 +154,15 @@ def test_checkpoint_is_deterministic_and_bound_to_owner_identity():
     assert restored.scene == owner.scene
     assert restored.scene.frame == owner.scene.frame
     assert restored.last_adopted_tick == -1
+    assert restored.world_id == "world-1"
+    assert json.loads(owner.checkpoint_bytes())["world_id"] == "world-1"
     assert not StaticEnvironmentOwner.validate_checkpoint(
         owner.checkpoint_bytes(), "another-owner", StaticEnvironmentOwner.CHECKPOINT_SCHEMA
     )
 
 
 def test_checkpoint_persists_accepted_step_and_rejects_replay_after_restore():
-    owner = StaticEnvironmentOwner(scene(), "env-owner")
+    owner = StaticEnvironmentOwner(scene(), "env-owner", world_id="world-1")
     accepted = correlation()
     owner.validate_and_adopt(
         StaticSceneCandidate(accepted, owner.scene), expected_correlation=accepted
@@ -160,6 +170,7 @@ def test_checkpoint_persists_accepted_step_and_rejects_replay_after_restore():
     restored = StaticEnvironmentOwner.from_checkpoint_bytes(owner.checkpoint_bytes())
     assert restored.last_accepted_correlation == accepted
     assert restored.last_accepted_correlation.world_id == "world-1"
+    assert restored.world_id == "world-1"
     assert restored.last_accepted_correlation.causal_tick == 0
     assert restored.last_accepted_correlation.physical_step_id == "step-0"
     assert restored.last_accepted_correlation.environment_id == "environment-1"
@@ -170,6 +181,11 @@ def test_checkpoint_persists_accepted_step_and_rejects_replay_after_restore():
             StaticSceneCandidate(accepted, restored.scene), expected_correlation=accepted
         )
     assert restored.checkpoint_bytes() == before_replay
+    other_world = correlation(1, world_id="other-world")
+    with pytest.raises(ValueError, match="bound World"):
+        restored.validate_and_adopt(
+            StaticSceneCandidate(other_world, restored.scene), expected_correlation=other_world
+        )
 
 
 @pytest.mark.parametrize(
@@ -184,7 +200,7 @@ def test_checkpoint_persists_accepted_step_and_rejects_replay_after_restore():
     ids=("root", "scene", "frame", "object", "scene-extra"),
 )
 def test_checkpoint_rejects_unknown_fields_at_each_scene_level(mutate):
-    encoded = StaticEnvironmentOwner(scene(), "env-owner").checkpoint_bytes()
+    encoded = StaticEnvironmentOwner(scene(), "env-owner", world_id="world-1").checkpoint_bytes()
     payload = json.loads(encoded)
     mutate(payload)
 
@@ -193,7 +209,7 @@ def test_checkpoint_rejects_unknown_fields_at_each_scene_level(mutate):
 
 
 def test_checkpoint_rejects_unknown_correlation_fields_without_losing_valid_state():
-    owner = StaticEnvironmentOwner(scene(), "env-owner")
+    owner = StaticEnvironmentOwner(scene(), "env-owner", world_id="world-1")
     accepted = correlation()
     owner.validate_and_adopt(
         StaticSceneCandidate(accepted, owner.scene), expected_correlation=accepted
@@ -211,26 +227,39 @@ def test_checkpoint_rejects_unknown_correlation_fields_without_losing_valid_stat
 
 
 def test_checkpoint_rejects_boolean_schema_version():
-    payload = json.loads(StaticEnvironmentOwner(scene(), "env-owner").checkpoint_bytes())
+    checkpoint = StaticEnvironmentOwner(scene(), "env-owner", world_id="world-1").checkpoint_bytes()
+    payload = json.loads(checkpoint)
     payload["schema_version"] = True
 
     with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
         StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
 
 
-def test_checkpoint_v3_persists_spheres_and_rejects_v2_without_compatibility():
+def test_checkpoint_v4_persists_spheres_and_rejects_v3_without_compatibility():
     sphere = StaticSphere("sphere-a", (1.25, -2.0, 0.5), 0.2, "environment-frame")
-    owner = StaticEnvironmentOwner(scene(spheres=(sphere,)), "env-owner")
+    owner = StaticEnvironmentOwner(scene(spheres=(sphere,)), "env-owner", world_id="world-1")
     encoded = owner.checkpoint_bytes()
     payload = json.loads(encoded)
-    assert payload["schema_version"] == 3
+    assert payload["schema_version"] == 4
     assert payload["scene"]["spheres"] == [
         {"object_id": "sphere-a", "center_m": [1.25, -2.0, 0.5], "radius_m": 0.2,
          "frame_id": "environment-frame"}
     ]
     restored = StaticEnvironmentOwner.from_checkpoint_bytes(encoded)
     assert restored.scene.spheres == (sphere,)
-    payload["schema_version"] = 2
+    payload["schema_version"] = 3
+    with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
+        StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
+
+
+def test_checkpoint_rejects_last_correlation_from_another_world():
+    owner = StaticEnvironmentOwner(scene(), "env-owner", world_id="world-1")
+    accepted = correlation()
+    owner.validate_and_adopt(
+        StaticSceneCandidate(accepted, owner.scene), expected_correlation=accepted
+    )
+    payload = json.loads(owner.checkpoint_bytes())
+    payload["last_accepted_correlation"]["world_id"] = "other-world"
     with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
         StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
 
@@ -238,7 +267,7 @@ def test_checkpoint_v3_persists_spheres_and_rejects_v2_without_compatibility():
 def test_checkpoint_rejects_unknown_sphere_fields_and_invalid_sphere_geometry():
     encoded = StaticEnvironmentOwner(
         scene(spheres=(StaticSphere("sphere-a", (0, 0, 0), 0.25, "environment-frame"),)),
-        "env-owner",
+        "env-owner", world_id="world-1",
     ).checkpoint_bytes()
     payload = json.loads(encoded)
     payload["scene"]["spheres"][0]["extra"] = "not accepted"
@@ -253,7 +282,7 @@ def test_checkpoint_rejects_unknown_sphere_fields_and_invalid_sphere_geometry():
 def test_checkpoint_rejects_duplicate_sphere_identity():
     owner = StaticEnvironmentOwner(
         scene(spheres=(StaticSphere("sphere-a", (0, 0, 0), 0.25, "environment-frame"),)),
-        "env-owner",
+        "env-owner", world_id="world-1",
     )
     payload = json.loads(owner.checkpoint_bytes())
     payload["scene"]["spheres"].append(payload["scene"]["spheres"][0])

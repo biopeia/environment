@@ -30,6 +30,7 @@ def correlation(tick=0, **changes):
 def owner():
     return DynamicEnvironmentOwner(
         owner_id="environment-owner-1",
+        world_id="world-1",
         environment_id="environment-1",
         environment_revision="revision-1",
         frame=FrameDescriptor(
@@ -64,6 +65,18 @@ def test_rejects_wrong_world_step_environment_or_revision_without_mutation(candi
     candidate = DynamicEnvironmentCandidate(candidate_correlation, state((9.0, 0.0, 0.0)))
     with pytest.raises(ValueError):
         current.validate_and_adopt(candidate, expected_correlation=correlation())
+    assert current.checkpoint_bytes() == before
+
+
+def test_bound_world_rejects_matching_candidate_and_expected_from_another_world():
+    current = owner()
+    before = current.checkpoint_bytes()
+    other_world = correlation(world_id="other-world")
+    with pytest.raises(ValueError, match="bound World"):
+        current.validate_and_adopt(
+            DynamicEnvironmentCandidate(other_world, state((9.0, 0.0, 0.0))),
+            expected_correlation=other_world,
+        )
     assert current.checkpoint_bytes() == before
 
 
@@ -103,6 +116,7 @@ def test_checkpoint_restore_preserves_state_identity_and_next_step_continuity():
     restored = DynamicEnvironmentOwner.from_checkpoint_bytes(encoded)
     assert restored.checkpoint_bytes() == encoded
     assert restored.owner_id == current.owner_id
+    assert restored.world_id == current.world_id
     assert restored.environment_id == current.environment_id
     assert restored.object_state == current.object_state
     second = correlation(1)
@@ -113,10 +127,27 @@ def test_checkpoint_restore_preserves_state_identity_and_next_step_continuity():
     assert restored.last_accepted_correlation == second
 
 
+def test_initial_checkpoint_preserves_world_attachment_before_first_step():
+    current = owner()
+    restored = DynamicEnvironmentOwner.from_checkpoint_bytes(current.checkpoint_bytes())
+    assert restored.world_id == "world-1"
+    other_world = correlation(world_id="other-world")
+    with pytest.raises(ValueError, match="bound World"):
+        restored.validate_and_adopt(
+            DynamicEnvironmentCandidate(other_world, state((1.0, 0.0, 0.0))),
+            expected_correlation=other_world,
+        )
+
+
 def test_checkpoint_is_closed_and_requires_exact_schema():
     encoded = owner().checkpoint_bytes()
     payload = json.loads(encoded)
     payload["unexpected"] = "reject"
+    with pytest.raises(ValueError, match="invalid dynamic Environment checkpoint"):
+        DynamicEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
+
+    payload = json.loads(encoded)
+    payload["schema_version"] = 1
     with pytest.raises(ValueError, match="invalid dynamic Environment checkpoint"):
         DynamicEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
 
@@ -136,6 +167,19 @@ def test_checkpoint_schema_and_checkpoint_reference_validation_are_explicit():
         encoded, "other-owner", DynamicEnvironmentOwner.CHECKPOINT_SCHEMA
     )
     assert not DynamicEnvironmentOwner.validate_checkpoint(encoded, "environment-owner-1", "wrong-schema")
+
+
+def test_checkpoint_rejects_last_correlation_from_another_world():
+    current = owner()
+    accepted = correlation()
+    current.validate_and_adopt(
+        DynamicEnvironmentCandidate(accepted, state((1.0, 0.0, 0.0))),
+        expected_correlation=accepted,
+    )
+    payload = json.loads(current.checkpoint_bytes())
+    payload["last_accepted_correlation"]["world_id"] = "other-world"
+    with pytest.raises(ValueError, match="invalid dynamic Environment checkpoint"):
+        DynamicEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
 
 
 def test_dynamic_state_rejects_non_finite_or_invalid_positions():
