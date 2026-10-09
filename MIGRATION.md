@@ -200,7 +200,7 @@ ticks, and provides deterministic owner-bound checkpoint bytes. This is not a
 solver contract, general scene schema, World runtime, HexCoord conversion, or
 backward-compatibility layer. No legacy source symbol is claimed as its source.
 
-## Current discrete spatial implementation: noncanonical / deferred
+## Existing discrete spatial implementation: provisional disposition only
 
 The target package still contains the historical discrete spatial family; it
 is not the canonical embodied Environment path and is not used by the new
@@ -209,9 +209,21 @@ static 3D projection. Current code inspection found `HexCoord` imported by
 are exercised by Environment unit tests. `src/environment/__init__.py` currently
 exports both `HexCoord` and `TerrainFieldState`. `TerrainFieldState` is defined
 in `terrain.py` and its tests still consume it through the package export.
-Disposition for this remaining discrete family is `DEFER` pending an explicit
-consumer/source inventory and decisions to retain only as a historical or
-scientific fixture, rewrite, or drop. It is not a promise of backward
-compatibility, a 3D adapter, or authority for the canonical embodied route.
-This bounded PR does not broadly delete it because the surveyed package has
-active internal/test consumers; no new API here depends on or adapts it.
+The earlier `SPLIT`/`DEFER` rows above record what was copied and what was
+excluded at those migration steps; they are not approval to retain the copied
+legacy implementation as TARGET. The remaining discrete family has only a
+provisional inventory status until every material source symbol and active
+consumer is classified against the ratified World/Environment split. No new
+hex/discrete source code may be copied, extended, or exposed to preserve an old
+API or behavior while that audit is open. Existing package/test consumers do
+not by themselves justify a TARGET role.
+
+For each symbol, the audit must decide whether a capability has independently
+justified TARGET meaning and should be newly implemented on its own terms, or
+whether the old implementation is `DROP`, `REWRITE`, or a temporary `DEFER`
+with no compatibility promise. A discrete scientific fixture remains an
+allowed future capability, but does not authorize carrying forward this legacy
+implementation. No mechanical HexCoord-to-3D conversion, compatibility
+adapter, or canonical embodied use is authorized. Preserve source evidence in
+the original repository where scientifically or provenance-relevant; do not
+delete that source as part of this target disposition work.
