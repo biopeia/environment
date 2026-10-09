@@ -370,3 +370,16 @@ The workspace-level integration tests are outside the source repository and thei
 ### Open inventory closure
 
 This audit supplies candidates only. Before declaring Environment migration complete, review each row with the responsible owner, select one final disposition (`MOVE`, `SPLIT`, `REWRITE`, `DROP`, or a time-bounded `DEFER`), identify a target path/owner where applicable, and record tests/evidence and caveats. The combined Lab consumers and cross-repository integration fixtures need explicit follow-up; static import search does not determine scientific admissibility or prove that a candidate is unused. No migration of source files is performed by this inventory PR.
+
+Direct test/experiment consumers outside `environment/tests` at the same source pin were found at these exact paths; this complements, and does not replace, the owning Lab inventory:
+
+- `lab/tests/experiments/protocols/test_visual_acquisition_protocol.py`
+- `lab/tests/integration/test_physics3d_effective_model_audit.py`, `lab/tests/integration/test_physics3d_vision.py`
+- `lab/tests/unit/lab/observation/test_physics_world_observer.py`, `test_remaining_semantic_families.py`, `test_world_environments.py`
+- `lab/tests/unit/lab/physics3d/test_effective_model_audit.py`, `test_resource.py`
+- `lab/tests/unit/lab/world/test_actuation_adapter.py`, `test_actuation_end_to_end.py`, `test_adapter.py`, `test_cli_view.py`, `test_hazard_ecology_v2.py`, `test_persistence.py`, `test_population.py`, `test_terrain_and_movement.py`, `test_transaction_integrity.py`, `test_world_ecology_v2.py`
+- `lab/tests/unit/observatory/test_world_integration.py`
+- `tests/experimental_integrity/test_embodiment_inheritance_integrity.py`
+- `scripts/bench_world_journal_index.py` (benchmark consumer, not a test)
+
+The direct-import search returned 66 Python paths total when including the Environment package/tests, Lab production modules, Lab tests/experiments, benchmark, and experimental-integrity test. The consumer set is mixed and includes historical World runtime tests; it is not a count of active production routes. A test reference alone is not evidence for retaining its source API.
