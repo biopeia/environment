@@ -1,6 +1,7 @@
 """Objective environmental laws and mutable environmental state."""
 
 from environment.genesis import EnvironmentState, GroundTruth
+from environment.identified_resource import IdentifiedFiniteResource
 from environment.hydrology import advance_surface_water
 from environment.laws import HazardLaw, PeriodicFieldLaw, ResourceLaw
 from environment.physical import PhysicalSphere, project_resource_geometry
@@ -13,6 +14,7 @@ __all__ = [
     "EnvironmentState",
     "advance_surface_water",
     "FiniteResourceState",
+    "IdentifiedFiniteResource",
     "GroundTruth",
     "HazardLaw",
     "HexCoord",
