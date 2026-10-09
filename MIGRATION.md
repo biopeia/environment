@@ -73,9 +73,9 @@
    integration was retargeted in `0f75c709bba8bfc9505a769662e9bf0e8e7e074a`.
    The extracted state model validates finite 3D geometry and positive/bounded
    configuration; it does not perform contact detection, construct colliders,
-   determine intake, or wire Organism/Embodiment transitions. It preserves the
-   source v1 checkpoint shape was present in the initial target extraction but
-   is superseded by PR #28's target-owned typed/versioned checkpoint contract;
+   determine intake, or wire Organism/Embodiment transitions. The source v1
+   checkpoint shape was present in the initial target extraction, but it is
+   superseded by PR #28's target-owned typed/versioned checkpoint contract, and
    the source-shaped payload is rejected. The retained scalar resource behavior
    does not establish physical equivalence to an endogenous mechanism, validate
    a scientific claim, or provide durable World/power-loss recovery. This is not
