@@ -269,8 +269,29 @@ class StaticEnvironmentOwner:
             raise ValueError("checkpoint must be bytes")
         try:
             payload: Any = json.loads(encoded)
+            if not isinstance(payload, dict) or set(payload) != {
+                "schema_version", "owner_id", "last_accepted_correlation", "scene"
+            }:
+                raise ValueError("invalid checkpoint fields")
+            if type(payload["schema_version"]) is not int or payload["schema_version"] != cls.SCHEMA_VERSION:
+                raise ValueError("unsupported static Environment checkpoint schema")
             scene_data = payload["scene"]
+            if not isinstance(scene_data, dict) or set(scene_data) != {
+                "environment_id", "environment_revision", "frame", "gravity_m_s2", "objects"
+            }:
+                raise ValueError("invalid scene checkpoint fields")
             frame_data = scene_data["frame"]
+            if not isinstance(frame_data, dict) or set(frame_data) != {
+                "frame_id", "parent_frame_id", "origin_m", "x_axis_in_parent",
+                "y_axis_in_parent", "z_axis_in_parent", "handedness", "up_axis",
+            }:
+                raise ValueError("invalid frame checkpoint fields")
+            raw_objects = scene_data["objects"]
+            if not isinstance(raw_objects, list) or any(
+                not isinstance(item, dict) or set(item) != {"object_id", "normal", "offset_m"}
+                for item in raw_objects
+            ):
+                raise ValueError("invalid object checkpoint fields")
             frame = FrameDescriptor(
                 frame_id=frame_data["frame_id"],
                 parent_frame_id=frame_data["parent_frame_id"],
@@ -286,11 +307,19 @@ class StaticEnvironmentOwner:
                 environment_revision=scene_data["environment_revision"],
                 frame=frame,
                 gravity_m_s2=tuple(scene_data["gravity_m_s2"]),
-                objects=tuple(StaticGroundPlane(**item) for item in scene_data["objects"]),
+                objects=tuple(StaticGroundPlane(**item) for item in raw_objects),
             )
             raw_correlation = payload["last_accepted_correlation"]
+            if raw_correlation is not None and (
+                not isinstance(raw_correlation, dict)
+                or set(raw_correlation) != {
+                    "world_id", "causal_tick", "physical_step_id", "environment_id",
+                    "environment_revision",
+                }
+            ):
+                raise ValueError("invalid correlation checkpoint fields")
             owner_id = _identity(payload["owner_id"], "owner_id")
-            if payload["schema_version"] != cls.SCHEMA_VERSION or project_static_scene(scene) != scene:
+            if project_static_scene(scene) != scene:
                 raise ValueError("invalid static Environment checkpoint fields")
             restored = cls(scene, owner_id)
             if raw_correlation is not None:
