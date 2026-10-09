@@ -1,5 +1,7 @@
 # Environment migration record
 
+> **Status note (PR #23):** The detailed extraction history and validation records below are preserved as historical provenance. They document what was copied, tested, and claimed at the earlier extraction baseline; they are not by themselves current TARGET authorization. The addendum at the end records current implementation dispositions and supersedes earlier candidate/gap statements where they conflict. Historical source evidence and per-slice validation are intentionally retained.
+
 ## Source and provenance
 
 - Source repository: local Biopeia source monorepo `symbiont-lab` (`/home/alessbarb/workspace/repos/active/symbiont-lab`)
@@ -256,7 +258,7 @@ target compatibility suite.
 | `GroundTruth` | `src/symbiont_world/genesis.py` (at the pinned revision, moved to `environment/src/environment/genesis.py`); source SHA `80d372a186513035f85a769db886e505cabba52d`; initial source `7d043253e9e855674fbe363cd17184bd42be8ef4`, regional additions `0dc2df5f480da245b37c10b41eed11e832c7fbee` and `b9dda68d8329339eb402b9349d54ebcc92dd3268`, moved by `13720935595fedabec2c376dc933629b0deae5aa`; tick exposure at `b61eefbe3a09d2da29dc8eb3f69c2fb9f4ed5f5f`; blob `34d90b1b33c1434d6b21164c9ceced08603d2271`. | `src/environment/genesis.py`, target extraction commit `7c0efdb7264596aff5a43b0fe2041dd81aa53c02`; blob `1f9876b635b861fc097a787fa5fddab357d01846` at target `main` head `45fd868957e69c6cfd66a685c7ad6ce74ed8ab76`. | Candidate `REWRITE`: representation and contract. Preserve only independently justified Environment ownership of external laws/genesis. Do not preserve `region_of(HexCoord)`, regional resource/hazard table shapes, numeric conventions, or require a global `GroundTruth` label/API. |
 | `EnvironmentState` | Same source path, pinned SHA and blob as `GroundTruth`; legacy mutable state originated with `7d043253e9e855674fbe363cd17184bd42be8ef4`, moved by `13720935595fedabec2c376dc933629b0deae5aa`, with later revision `b61eefbe3a09d2da29dc8eb3f69c2fb9f4ed5f5f`. | `src/environment/genesis.py`, checkpoint implementation target commit `eb55c1c703cbf770216733da51a7604279338cba`; blob `1f9876b635b861fc097a787fa5fddab357d01846` at target `main` head `45fd868957e69c6cfd66a685c7ad6ce74ed8ab76`. | Candidate `REWRITE`: implementation, API and checkpoint format. Environment owns its state and supplies owner checkpoint references; the World commit contract requires those references to be durably identifiable and recoverable before commit. HexCoord-keyed pools and v1 checkpoint bytes are not retained. Preserve owner adoption/recovery semantics as contract, not old serialization compatibility. Workspace consumers are `tests/integration/test_first_biopeia_causal_tick.py` and `test_durable_checkpoint_restore_slice.py`; retarget their assertions to replacement semantics. |
 
-## Removal sequence and current gap
+## Removal sequence and current gap (historical, before PR #23)
 
 The target package tests/dependencies to account for are
 `tests/unit/test_terrain.py`, `tests/unit/test_surface_water.py`,
@@ -283,3 +285,36 @@ final dispositions remain open. Until reviewed and resolved, the current
 hex-bound target code is a migration gap, not an approved final state. Tests
 retained after replacement must exercise the new contract, not act as
 historical compatibility tests.
+
+## Current implementation dispositions — PR #23
+
+This addendum is authoritative for the current Environment branch after PR #23. The prior sections remain intact as historical extraction/provenance/validation records; their earlier `MOVE`, `SPLIT`, `DEFER`, `candidate`, or “current gap” descriptions must be read as statements about the earlier target baseline, not the branch after this cleanup.
+
+The governing architecture separates World causal coordination from Environment-owned external environmental state and dynamics. The embodied path is not constrained to the historical hex topology. Legacy behavior is not retained, wrapped, mechanically converted, or given a compatibility shim merely to preserve it. No universal Environment schema, physical calibration, or replacement terrain/hydrology model is introduced here.
+
+| Source symbol/path | Former Biopeia target path | Current disposition | Evidence and reason |
+| --- | --- | --- | --- |
+| `symbiont_world/topology.py::HexCoord`, later `environment/src/environment/topology.py::HexCoord` | `src/environment/spatial.py` | DROP | Detailed source and target commit/blob provenance appears in the historical per-symbol table above. Axial `q/r`, six-neighbor navigation, and hex distance encode historical discrete topology. Workspace search found its consumers only in the Environment package/tests and the two legacy integration fixtures; the latter were retargeted locally. No conversion to 3D and no compatibility shim. |
+| `DynamicGeography` static fields / target `TerrainFieldState` | `src/environment/terrain.py` | DROP | The earlier extraction was a finite rectangular `HexCoord` map with copied formulas and seed phase, not a justified general Environment contract. Detailed source path/blob/commit and extraction test limitations are recorded above. No production runtime consumer was found. |
+| `DynamicGeography._initialize_surface_water` | `src/environment/surface_water.py` | DROP | Cell-keyed initialization and thresholds inherit the hex grid and copied terrain formulas. Package/workspace usage was limited to legacy tests. No grid-to-3D conversion or replacement model. |
+| `DynamicGeography.step()` surface-water transition | `src/environment/hydrology.py` | DROP | Update depended on cell adjacency, terrain fields, and source-specific coefficients, with no established units, physical timestep, conservation claim, or scientific validation. Its target use was limited to its focused package test. |
+| `WorldEnvironment` / target `EnvironmentState`, `GroundTruth`, regional resource/hazard lookup | `src/environment/genesis.py` | DROP | This mixed laws with `HexCoord`-keyed pools, cell/region lookup, and checkpoint data preserving those semantics. Its workspace callers were `test_first_biopeia_causal_tick.py` and `test_durable_checkpoint_restore_slice.py`; both removed the obsolete field premise locally while preserving their separate causal-path and durable World-manifest test purposes. No universal Environment schema replaces it. |
+| `PeriodicFieldLaw`, `ResourceLaw`, `HazardLaw` | `src/environment/laws.py` | DROP | No production consumers remain beyond the removed genesis path. Tests asserted copied implementation behavior, not ratified units, physical meaning, or scientific validation. |
+| `effective_permeability`, `effective_fertility`, `resource_renewal_factor` | `src/environment/ecology.py` | DROP | Extracted scalar formulas have no independent TARGET contract or production consumer; only their focused tests referenced them. |
+| `FiniteResourceState` | `src/environment/resource.py` | RETAIN | Independent finite-resource state is consumed by Lab `src/lab/interventions/material_transfer.py` and covered by `lab/tests/integration/test_material_transfer_intervention.py`. This supports controlled scalar transfer/state only, not physical equivalence to an endogenous mechanism. Full source commit provenance and validation caveats remain in the historical extraction record above. |
+| `IdentifiedFiniteResource` | `src/environment/identified_resource.py` | RETAIN | Typed identity/checkpoint wrapper used by the Lab material-transfer consumer. It has no Environment hex dependency. |
+| `StaticPhysicalScene`, `StaticEnvironmentOwner` | `src/environment/static_scene.py` | RETAIN | Target-authored explicit-frame/SI scene and owner adoption/checkpoint boundary, exercised by `tests/integration/test_first_biopeia_physical_causal_step.py` and `tests/test_static_scene.py`. It is a narrow static capability, not a universal schema or procedural terrain model. |
+| Explicit resource geometry projection | `src/environment/physical.py` | RETAIN | Target-authored frame/SI projection from resource-relative lengths, not copied hex behavior. It is separate from solver execution and semantic authority. It has package test coverage but no current production consumer; that caveat does not justify retaining legacy behavior and does not establish integrated physical execution. No prior unitless API alias is provided. |
+
+### Workspace integration test disposition
+
+The workspace root is not a Git repository. The following edits are local workspace test retargeting and are intentionally not included in the Environment PR:
+
+- `tests/integration/test_first_biopeia_causal_tick.py` now supplies an explicit deterministic fixture input to the existing bounded transduction/cognition/command/Embodiment-candidate/World-publication/passive-Observation test. It no longer asserts Environment field semantics.
+- `tests/integration/test_durable_checkpoint_restore_slice.py` no longer registers the obsolete Environment field/checkpoint API as an owner. It still exercises multi-owner Organism/Embodiment checkpoint publication, restore, continuation, and World manifest behavior.
+
+Workspace-wide source reference search found no remaining imports or uses of the removed Environment APIs outside the removed legacy tests and these retargeted fixtures. This is a bounded consumer audit, not proof that the full historical Environment inventory is complete.
+
+### Compatibility and completion limits
+
+There is no compatibility layer for `HexCoord`, `TerrainFieldState`, `EnvironmentState`, `GroundTruth`, copied field/ecology laws, or surface-water APIs. There is no hex-to-3D conversion. The source repository was not modified. This addendum covers only the symbols above; the broader MOVE/SPLIT/REWRITE/DROP/DEFER inventory remains open, and `DEFER` entries are not final dispositions. The prior extraction tests/validation are preserved as historical evidence, not as scientific adequacy or current-runtime proof.

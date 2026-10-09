@@ -1,12 +1,12 @@
 # Agent entrypoint — environment
 
-**Status: migration-stage guidance.** This repository contains a bounded, reversible copy-first extraction, **not** a declaration of architectural ratification, complete functionality, or migration cut-over.
+**Status: migration-stage guidance.** This repository contains bounded Biopeia TARGET capabilities, not a complete Environment runtime or declaration of migration cut-over.
 
 ## Current ownership boundary
 
-- **Owns in the current extracted slice:** objective environment laws, resource/field state and deterministic queries.
+- **Owns in the current slice:** explicit static environmental scene/owner projection and identified finite-resource state.
 - **Does not own:** World identity, causal commit/order, Organism goals or learned semantics.
-- Read [README.md](README.md) for current implemented scope and [MIGRATION.md](MIGRATION.md) for provenance, excluded work, source SHA, and deferred ownership. These local documents describe the extraction; they do not replace canonical constitutional or scientific authorities.
+- Read [README.md](README.md) for current implemented scope and [MIGRATION.md](MIGRATION.md) for provenance, excluded work, source SHA, and deferred ownership. These local documents record bounded implementation scope; they do not replace canonical architectural or scientific authorities.
 
 ## Shared coordination guidance
 
@@ -24,7 +24,7 @@ These are links for human/agent reading, **not automatic instruction inheritance
 2. Classify work by established ORDINARY/SCIENTIFIC/FROZEN/CONSTITUTIONAL policy and evaluate risk separately. Do not infer approval from a label.
 3. Identify cross-domain contracts and record consumers/producers, data ownership, version and compatibility; do not import another domain's private internals as a shortcut.
 4. Technical CI validates implementation only. It does not prove scientific efficacy or authorize experiments, constitutional changes or promotion.
-5. Preserve migration provenance and the original source; do not delete, transfer authority, start Pass 15, or claim cut-over without express authorization.
+5. Preserve migration provenance and the original source; delete legacy code only under explicit owner authorization. Do not transfer authority, start Pass 15, or claim cut-over without express authorization.
 6. On conflicts between canonical sources, stop and request a documented decision. This file does not supersede protected instructions or approved ADRs.
 
 This entrypoint introduces no new required CI gate, automatic merge, or package dependencies.
