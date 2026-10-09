@@ -27,3 +27,21 @@ def test_identified_resource_checkpoint_rejects_invalid_identity_or_shape() -> N
     payload["resource_id"] = ""
     with pytest.raises(ValueError, match="resource_id"):
         IdentifiedFiniteResource.from_checkpoint_bytes(json.dumps(payload).encode())
+
+
+def test_owner_checkpoint_validation_checks_identity_schema_and_bytes() -> None:
+    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=3.5))
+    encoded = owner.checkpoint_bytes()
+
+    assert IdentifiedFiniteResource.validate_checkpoint(
+        encoded, "resource.alpha", "environment-identified-resource-v1"
+    )
+    assert not IdentifiedFiniteResource.validate_checkpoint(
+        encoded, "resource.other", "environment-identified-resource-v1"
+    )
+    assert not IdentifiedFiniteResource.validate_checkpoint(
+        encoded, "resource.alpha", "unsupported-schema"
+    )
+    assert not IdentifiedFiniteResource.validate_checkpoint(
+        b"not a checkpoint", "resource.alpha", "environment-identified-resource-v1"
+    )

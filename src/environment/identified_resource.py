@@ -56,5 +56,21 @@ class IdentifiedFiniteResource:
             state=FiniteResourceState.from_checkpoint(payload["state"]),
         )
 
+    @classmethod
+    def validate_checkpoint(cls, encoded: bytes, owner_identity: str, schema_version: str) -> bool:
+        """Validate recoverable owner bytes without issuing a World receipt."""
+        if schema_version != "environment-identified-resource-v1":
+            return False
+        try:
+            checkpoint = cls.from_checkpoint_bytes(encoded)
+        except (TypeError, ValueError):
+            return False
+        return checkpoint.resource_id == owner_identity
+
+    @classmethod
+    def verify_restoration(cls, encoded: bytes, owner_identity: str, schema_version: str) -> bool:
+        """Verify a restored checkpoint through the same owner codec boundary."""
+        return cls.validate_checkpoint(encoded, owner_identity, schema_version)
+
 
 __all__ = ["IdentifiedFiniteResource"]
