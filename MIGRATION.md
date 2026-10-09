@@ -100,8 +100,8 @@ The selected package has no first-party runtime dependency beyond the Python sta
 
 | Source element | Disposition | Target path | Provenance / boundary |
 | --- | --- | --- | --- |
-| `DynamicGeography.step()` surface-water equilibrium, relaxation, temperature loss, downhill-neighbor inflow, sparse threshold, and rounding only | SPLIT / REWRITE | `src/environment/hydrology.py::advance_surface_water` | Source repository SHA `80d372a186513035f85a769db886e505cabba52d`; source file `environment/src/environment/terrain.py`, blob `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2`, path commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`. |
-| Focused deterministic transition tests | REWRITE | `tests/test_hydrology.py` | Tests source-formula values, explicit finite bounds, one-ring candidate expansion, sparse threshold, and non-mutation. |
+| `DynamicGeography.step()` surface-water transition, source lines 366–390 only (equilibrium, relaxation, temperature loss, downhill-neighbor inflow, sparse threshold, rounding) | SPLIT / REWRITE | `src/environment/hydrology.py::advance_surface_water` | Source repository SHA `80d372a186513035f85a769db886e505cabba52d`; `environment/src/environment/terrain.py`, blob `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2`, path commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`. Source active-set construction at lines 358–365 and occupancy/death interpretation are deliberately not copied. |
+| Focused deterministic transition tests | REWRITE | `tests/test_hydrology.py` | `test_relaxes_water_toward_equilibrium_and_keeps_source_rounding`, `test_expands_active_set_by_one_neighbor_and_applies_downhill_inflow`, sparse-threshold, explicit-grid-bound, finite-input, and non-mutation assertions. |
 
 The extracted transition is a pure update over caller-supplied Environment-owned
 water/static-field maps and an explicit valid-cell set. The caller supplies the
@@ -112,5 +112,7 @@ fields (`0.5` moisture/elevation/temperature and `0.8` permeability),
 coefficients, threshold (`0.002`), and four-decimal rounding. Unlike the mixed
 source method, it rejects input state/candidates outside the supplied grid and
 rejects non-finite field values. It does not implement substrate impulse,
-other ecological decays, checkpointing, or scientific calibration. The source
-monorepo remains unchanged.
+other ecological decays, checkpointing, or scientific calibration. This is
+non-overlapping with the surface-water initialization-only candidate (#7),
+the pure effective-field equations (#9), and physical geometry projection
+(#8). The source monorepo remains unchanged.
