@@ -6,6 +6,11 @@ from environment.laws import HazardLaw, PeriodicFieldLaw, ResourceLaw
 from environment.physical import PhysicalSphere, project_resource_geometry
 from environment.resource import FiniteResourceState
 from environment.spatial import HexCoord
+from environment.substrate import (
+    SubstrateImpulseResult,
+    SubstrateImpulseTransition,
+    apply_substrate_impulse,
+)
 from environment.surface_water import initialize_surface_water
 from environment.terrain import TerrainFieldState
 
@@ -19,7 +24,10 @@ __all__ = [
     "PeriodicFieldLaw",
     "PhysicalSphere",
     "ResourceLaw",
+    "SubstrateImpulseResult",
+    "SubstrateImpulseTransition",
     "TerrainFieldState",
+    "apply_substrate_impulse",
     "project_resource_geometry",
     "initialize_surface_water",
 ]

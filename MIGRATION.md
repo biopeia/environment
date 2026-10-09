@@ -142,6 +142,26 @@
    hydrology model or claim that CURRENT runtime callers use this extracted
    function.
 
+12. Split the source `DynamicGeography.apply_directional_impulse` substrate
+   response into the pure `apply_substrate_impulse` transition and immutable
+   result values in `src/environment/substrate.py`. Provenance: pinned source
+   SHA `80d372a186513035f85a769db886e505cabba52d`, path
+   `environment/src/environment/terrain.py`, blob
+   `7b241ec9e6cd1f854a0052428800bcd9b83dd7b2`, source path commit
+   `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab` (method lines 269–330).
+   Disposition: `SPLIT`/`REWRITE`. The caller supplies origin/target, scalar
+   magnitude, grid dimensions, and the current field maps. The function
+   preserves the source coefficients, clamping, defaults, and no-transfer
+   boundary behavior while returning new read-only maps instead of mutating a
+   `DynamicGeography` object. It does not derive impulses from actuation,
+   establish units or physical equivalence, integrate a solver, or claim
+   scientific calibration. Its rectangular-grid check is an explicit target
+   boundary replacing source dependence on `HexTopology.in_bounds`; invalid
+   targets still disturb only the origin. Source tests
+   `lab/tests/unit/lab/world/test_terrain_and_movement.py::test_directional_impulse_redistributes_existing_substrate_without_semantic_action`
+   and `::test_boundary_impulse_disturbs_origin_without_fabricating_transfer`
+   are behavioral references, not scientific or physical validation.
+
 ## Validation scope
 
 The selected package has no first-party runtime dependency beyond the Python standard library. Validation is scoped to the copied/split laws and environmental-state unit tests. Passing tests do not establish scientific adequacy of any ecological law or complete migration of the source Environment package.
