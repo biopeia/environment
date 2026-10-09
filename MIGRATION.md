@@ -384,7 +384,7 @@ Twenty direct test/experiment consumer paths outside `environment/tests` were fo
 
 The direct-import search returned 66 Python paths total, comprising the Environment package/tests, Lab production modules, 20 direct test/experiment consumer paths listed above, and one benchmark path. The consumer set is mixed and includes historical World runtime tests; it is not a count of active production routes. A test reference alone is not evidence for retaining its source API.
 
-## Target-authored deterministic genesis capability — PR #25
+## Target-authored deterministic genesis capability — Issue #25, PR #26
 
 This functional slice is new Biopeia TARGET code, not an extraction, rewrite,
 or compatibility layer for historical `EnvironmentState`/`genesis.py` or any
