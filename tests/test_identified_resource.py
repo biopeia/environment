@@ -49,6 +49,20 @@ def test_identified_resource_checkpoint_rejects_invalid_identity_or_shape() -> N
         IdentifiedFiniteResource.from_checkpoint_bytes(json.dumps(source_v1).encode())
 
 
+def test_identified_resource_checkpoint_rejects_unknown_fields_at_each_level() -> None:
+    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=3.5))
+    payload = json.loads(owner.checkpoint_bytes())
+
+    payload["unexpected"] = "future-looking but unsupported"
+    with pytest.raises(ValueError, match="checkpoint fields"):
+        IdentifiedFiniteResource.from_checkpoint_bytes(json.dumps(payload).encode())
+
+    payload = json.loads(owner.checkpoint_bytes())
+    payload["state"]["unexpected"] = "unsupported nested field"
+    with pytest.raises(ValueError, match="finite resource checkpoint contract"):
+        IdentifiedFiniteResource.from_checkpoint_bytes(json.dumps(payload).encode())
+
+
 def test_owner_checkpoint_validation_checks_identity_schema_and_bytes() -> None:
     owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=3.5))
     encoded = owner.checkpoint_bytes()
