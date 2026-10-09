@@ -55,6 +55,31 @@ def test_field_values_are_deterministic_for_same_tick():
     assert a == b
 
 
+def test_field_values_at_is_an_explicit_pure_causal_projection():
+    env = EnvironmentState(_ground_truth())
+    before = env.snapshot()
+
+    at_ten = env.field_values_at(10)
+    at_three = env.field_values_at(3)
+
+    assert at_ten[FIELD_ID] == pytest.approx(
+        _ground_truth().fields[FIELD_ID].value_at(10)
+    )
+    assert at_three[FIELD_ID] == pytest.approx(
+        _ground_truth().fields[FIELD_ID].value_at(3)
+    )
+    assert env.snapshot() == before
+    with pytest.raises(TypeError):
+        at_ten[FIELD_ID] = 42.0
+
+
+@pytest.mark.parametrize("tick", [-1, 1.5, True])
+def test_field_values_at_rejects_invalid_causal_ticks(tick):
+    env = EnvironmentState(_ground_truth())
+    with pytest.raises(ValueError, match="non-negative integer causal tick"):
+        env.field_values_at(tick)
+
+
 def test_cell_is_not_materialized_before_first_access():
     env = EnvironmentState(_ground_truth())
     cell = HexCoord(3, 3)

@@ -86,6 +86,22 @@ class EnvironmentState:
 
         return int(self._tick)
 
+    def field_values_at(self, tick: int) -> Mapping[FieldId, float]:
+        """Return an immutable field projection at an explicit causal tick.
+
+        This is a pure query: it does not advance or mutate EnvironmentState.
+        World can therefore request the environmental values for a proposed
+        causal transition without relying on call order or host wall-clock time.
+        """
+        if type(tick) is not int or tick < 0:
+            raise ValueError("tick must be a non-negative integer causal tick")
+        return MappingProxyType(
+            {
+                field_id: law.value_at(tick)
+                for field_id, law in self.ground_truth.fields.items()
+            }
+        )
+
     def propagate_fields(self, tick: int) -> None:
         self._tick = int(tick)
         self._field_values = {
