@@ -92,6 +92,27 @@
    owner-aligned environmental state candidate, not evidence that the old
    DynamicGeography path should be retained wholesale.
 
+9. Split deterministic initial surface-water values from the mixed source
+   `DynamicGeography._initialize_surface_water`. Provenance: pinned source
+   `environment/src/environment/terrain.py` at source SHA
+   `80d372a186513035f85a769db886e505cabba52d`, introduced into that path by
+   source commit `43a65f0ab220adbcd7afce6fccb3f07e91eb77ab`. Disposition:
+   `SPLIT`. `initialize_surface_water` requires explicit, complete moisture,
+   elevation, and permeability mappings for every cell in the provided finite
+   rectangular dimensions. It preserves the source formula, cutoff, clamp,
+   and four-decimal rounding. It deliberately does not inherit the source
+   constructor's empty-map generation or partial-map override behavior, and it
+   does not provide implicit field defaults. The function is initialization
+   only: `DynamicGeography.step`, substrate impulses, occupant inputs,
+   persistence, World transaction state, and runtime/Lab wiring remain
+   excluded. Existing source coverage is
+   `lab/tests/unit/lab/world/test_terrain_and_movement.py::test_surface_water_is_deterministic_and_persistent_roundtrip`; it asserts
+   repeatability and serialization roundtrip, not a numeric formula oracle.
+   New target tests exercise the numeric formula, threshold, clamp, immutable
+   result, and complete-input requirement. This does not validate a scientific
+   hydrology model or claim that CURRENT runtime callers use this extracted
+   function.
+
 ## Validation scope
 
 The selected package has no first-party runtime dependency beyond the Python standard library. Validation is scoped to the copied/split laws and environmental-state unit tests. Passing tests do not establish scientific adequacy of any ecological law or complete migration of the source Environment package.
