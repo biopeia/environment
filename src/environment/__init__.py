@@ -2,6 +2,7 @@
 
 from environment.genesis import EnvironmentState, GroundTruth
 from environment.laws import HazardLaw, PeriodicFieldLaw, ResourceLaw
+from environment.physical import PhysicalSphere, project_resource_geometry
 from environment.resource import FiniteResourceState
 from environment.spatial import HexCoord
 from environment.terrain import TerrainFieldState
@@ -13,6 +14,8 @@ __all__ = [
     "HazardLaw",
     "HexCoord",
     "PeriodicFieldLaw",
+    "PhysicalSphere",
     "ResourceLaw",
     "TerrainFieldState",
+    "project_resource_geometry",
 ]
