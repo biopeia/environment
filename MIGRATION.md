@@ -16,6 +16,7 @@
 | `src/environment/laws.py` | `environment/src/environment/laws.py` | MOVE | Environmental field, resource, and hazard laws; copied from the pinned source. |
 | `src/environment/genesis.py` | `environment/src/environment/genesis.py` | SPLIT | Retains `GroundTruth` and environmental field/resource runtime state. `WorldEnvironment` was renamed `EnvironmentState`; import of coordinate type now points to the extracted value object. |
 | `src/environment/spatial.py` | `environment/src/environment/topology.py` (`HexCoord` only) | SPLIT | Contains only the coordinate value object needed to index spatial environment state. Placement, occupancy, grid bounds, and move resolution are not copied. |
+| `src/environment/resource.py` | `environment/src/environment/physics3d/resource.py` (finite source state only) | SPLIT | Extracts the environment-owned position/radii, scalar field, finite quantity, bounded offer/accepted-consumption, and v1 checkpoint payload as `FiniteResourceState`. PhysicsScene geometry/contact detection and runtime/Organism wiring are excluded. |
 | `src/environment/__init__.py` | Source package exports | REWRITE | Explicit minimal Environment-only public surface; no exports for World or Observation responsibilities. |
 | `tests/unit/test_laws.py` | `environment/tests/unit/world/test_laws.py` | MOVE | Focused law tests. |
 | `tests/unit/test_genesis.py` | `environment/tests/unit/world/test_genesis.py` | SPLIT | Focused environmental-state coverage; import updated to `EnvironmentState` and `HexCoord`. |
@@ -34,7 +35,7 @@
 | `environment/src/environment/genesis_v1.py`, `genesis_v2.py` | DEFER | Scenario builders couple objective environmental laws to World constitution and Observation signal identifiers. |
 | `environment/src/environment/rng.py` | DEFER | Current API is explicitly World-namespaced RNG. Environment-specific random-stream ownership must be established at the World contract boundary before extraction. |
 | `environment/src/environment/physics3d/environments.py` | DEFER | Contains lab-specific nursery/study stimuli and metabolic support in addition to physical fixtures; copying it would import experimental intervention semantics. |
-| `environment/src/environment/physics3d/resource.py` | DEFER | Physical engine scene ownership and contact execution are substrate/World-boundary concerns; no engine dependency is introduced into this first Environment slice. |
+| `environment/src/environment/physics3d/resource.py` (scene adapter portions) | DEFER | PhysicsScene geometry and contact execution are substrate/World-boundary concerns; these portions were intentionally not copied into the Environment state model. |
 | source `environment/tests` not listed above | DEFER | Tests cover excluded World, Observation, mixed terrain, scenario-builder, or integration responsibilities. |
 
 ## Known rewrites
@@ -58,6 +59,19 @@
    immutable configuration identity/reference and cross-authority publication
    remain the responsibility of World integration; this API alone is not a
    durable World checkpoint or a crash-recovery guarantee.
+7. Split the finite physical resource in the pinned source into `FiniteResourceState`.
+   Exact scalar field, offer/accepted-consumption, and checkpoint behavior were
+   derived from `environment/src/environment/physics3d/resource.py` at source
+   SHA `80d372a186513035f85a769db886e505cabba52d`. The mechanism originated in
+   source commit `7f526ddc1d2393e8b7af41a967dfd6af8cc6aa87`; depletion behavior
+   was added in `7dd33065829f2afc17281797bcdcb143d015e6f5`, and debit was bounded
+   by accepted intake in `a2b98b78604866b7c539dae75a48e64a74d547f4`. Scene
+   integration was retargeted in `0f75c709bba8bfc9505a769662e9bf0e8e7e074a`.
+   The extracted state model validates finite 3D geometry and positive/bounded
+   configuration; it does not perform contact detection, construct colliders,
+   determine intake, or wire Organism/Embodiment transitions. It preserves the
+   source v1 resource checkpoint shape. This is not proof that the prior runtime
+   integration conforms to the TARGET authority contract.
 
 ## Validation scope
 
