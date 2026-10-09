@@ -75,7 +75,7 @@ def test_same_complete_spec_generates_same_scene_and_explicit_provenance():
 
 def test_generated_geometry_is_scene_authority_and_checkpoint_restores_it():
     generated = generate_procedural_environment(_spec())
-    owner = StaticEnvironmentOwner(generated.scene, "environment-owner")
+    owner = StaticEnvironmentOwner(generated.scene, "environment-owner", world_id="world-1")
     restored = StaticEnvironmentOwner.from_checkpoint_bytes(owner.checkpoint_bytes())
 
     assert restored.scene.spheres == generated.scene.spheres
@@ -85,7 +85,8 @@ def test_generated_geometry_is_scene_authority_and_checkpoint_restores_it():
 
 
 def test_checkpoint_keeps_generator_configuration_structured_and_opaque_on_restore():
-    owner = StaticEnvironmentOwner(generate_procedural_environment(_spec()).scene, "environment-owner")
+    scene = generate_procedural_environment(_spec()).scene
+    owner = StaticEnvironmentOwner(scene, "environment-owner", world_id="world-1")
     payload = json.loads(owner.checkpoint_bytes())
     payload["scene"]["genesis"]["configuration"]["future_generator_input"] = {"mode": "opaque"}
 
@@ -102,7 +103,8 @@ def test_checkpoint_keeps_generator_configuration_structured_and_opaque_on_resto
     lambda provenance: provenance.__setitem__("configuration", []),
 ])
 def test_checkpoint_rejects_malformed_genesis_provenance_shape(mutate):
-    owner = StaticEnvironmentOwner(generate_procedural_environment(_spec()).scene, "environment-owner")
+    scene = generate_procedural_environment(_spec()).scene
+    owner = StaticEnvironmentOwner(scene, "environment-owner", world_id="world-1")
     payload = json.loads(owner.checkpoint_bytes())
     mutate(payload["scene"]["genesis"])
 

@@ -57,19 +57,21 @@ class DynamicEnvironmentCandidate:
 class DynamicEnvironmentOwner:
     """Adopts one stable object's candidate state and checkpoints it strictly."""
 
-    SCHEMA_VERSION = 1
-    CHECKPOINT_SCHEMA = "environment-dynamic-object-v1"
+    SCHEMA_VERSION = 2
+    CHECKPOINT_SCHEMA = "environment-dynamic-object-v2"
 
     def __init__(
         self,
         *,
         owner_id: str,
+        world_id: str,
         environment_id: str,
         environment_revision: str,
         frame: FrameDescriptor,
         object_state: DynamicObjectState,
     ) -> None:
         self._owner_id = _identity(owner_id, "owner_id")
+        self._world_id = _identity(world_id, "world_id")
         self._environment_id = _identity(environment_id, "environment_id")
         self._environment_revision = _identity(environment_revision, "environment_revision")
         if not isinstance(frame, FrameDescriptor):
@@ -85,6 +87,10 @@ class DynamicEnvironmentOwner:
     @property
     def owner_id(self) -> str:
         return self._owner_id
+
+    @property
+    def world_id(self) -> str:
+        return self._world_id
 
     @property
     def environment_id(self) -> str:
@@ -115,10 +121,12 @@ class DynamicEnvironmentOwner:
         if not isinstance(candidate, DynamicEnvironmentCandidate):
             raise ValueError("candidate must be DynamicEnvironmentCandidate")
         if not isinstance(expected_correlation, PhysicalStepCorrelation):
-            raise ValueError("expected_correlation must be World-authorized correlation")
+            raise ValueError("expected_correlation must be Environment correlation data")
+        if expected_correlation.world_id != self.world_id:
+            raise ValueError("expected correlation does not match bound World identity")
         correlation = candidate.correlation
         if correlation != expected_correlation:
-            raise ValueError("candidate correlation does not match World-authorized expected correlation")
+            raise ValueError("candidate correlation does not match expected Environment correlation")
         if (correlation.environment_id, correlation.environment_revision) != (
             self.environment_id, self.environment_revision
         ):
@@ -151,6 +159,7 @@ class DynamicEnvironmentOwner:
         payload = {
             "schema_version": self.SCHEMA_VERSION,
             "owner_id": self.owner_id,
+            "world_id": self.world_id,
             "environment_id": self.environment_id,
             "environment_revision": self.environment_revision,
             "frame": {
@@ -185,7 +194,7 @@ class DynamicEnvironmentOwner:
         try:
             payload: Any = json.loads(encoded)
             if not isinstance(payload, dict) or set(payload) != {
-                "schema_version", "owner_id", "environment_id", "environment_revision",
+                "schema_version", "owner_id", "world_id", "environment_id", "environment_revision",
                 "frame", "object_state", "last_accepted_correlation",
             }:
                 raise ValueError("invalid checkpoint fields")
@@ -202,6 +211,7 @@ class DynamicEnvironmentOwner:
                 raise ValueError("invalid frame checkpoint fields")
             owner = cls(
                 owner_id=payload["owner_id"],
+                world_id=payload["world_id"],
                 environment_id=payload["environment_id"],
                 environment_revision=payload["environment_revision"],
                 frame=FrameDescriptor(
@@ -224,6 +234,8 @@ class DynamicEnvironmentOwner:
                 if not isinstance(raw_correlation, dict) or set(raw_correlation) != expected_fields:
                     raise ValueError("invalid correlation checkpoint fields")
                 correlation = PhysicalStepCorrelation(**raw_correlation)
+                if correlation.world_id != owner.world_id:
+                    raise ValueError("checkpoint correlation does not match bound World identity")
                 if (correlation.environment_id, correlation.environment_revision) != (
                     owner.environment_id, owner.environment_revision
                 ):

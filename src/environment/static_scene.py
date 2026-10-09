@@ -49,7 +49,11 @@ def _cross(left: tuple[float, float, float], right: tuple[float, float, float]) 
 
 @dataclass(frozen=True, slots=True)
 class PhysicalStepCorrelation:
-    """World-authorized correlation value; Environment does not mint authority."""
+    """Environment-local correlation data derived from a World step context.
+
+    This value correlates an Environment candidate; it is not proof of World
+    authorization. The integration adapter derives it from World context.
+    """
 
     world_id: str
     causal_tick: int
@@ -271,17 +275,22 @@ def project_static_scene(scene: StaticPhysicalScene) -> StaticPhysicalScene:
 class StaticEnvironmentOwner:
     """Small owner boundary for a static scene and its recoverable step marker."""
 
-    SCHEMA_VERSION = 3
-    CHECKPOINT_SCHEMA = "environment-static-scene-v3"
+    SCHEMA_VERSION = 4
+    CHECKPOINT_SCHEMA = "environment-static-scene-v4"
 
-    def __init__(self, scene: StaticPhysicalScene, owner_id: str) -> None:
+    def __init__(self, scene: StaticPhysicalScene, owner_id: str, *, world_id: str) -> None:
         self._scene = project_static_scene(scene)
         self._owner_id = _identity(owner_id, "owner_id")
+        self._world_id = _identity(world_id, "world_id")
         self._last_accepted_correlation: PhysicalStepCorrelation | None = None
 
     @property
     def owner_id(self) -> str:
         return self._owner_id
+
+    @property
+    def world_id(self) -> str:
+        return self._world_id
 
     @property
     def scene(self) -> StaticPhysicalScene:
@@ -303,10 +312,12 @@ class StaticEnvironmentOwner:
         if not isinstance(candidate, StaticSceneCandidate):
             raise ValueError("candidate must be StaticSceneCandidate")
         if not isinstance(expected_correlation, PhysicalStepCorrelation):
-            raise ValueError("expected_correlation must be World-authorized correlation")
+            raise ValueError("expected_correlation must be Environment correlation data")
+        if expected_correlation.world_id != self.world_id:
+            raise ValueError("expected correlation does not match bound World identity")
         correlation = candidate.correlation
         if correlation != expected_correlation:
-            raise ValueError("candidate correlation does not match World-authorized expected correlation")
+            raise ValueError("candidate correlation does not match expected Environment correlation")
         if (expected_correlation.environment_id, expected_correlation.environment_revision) != (
             self._scene.environment_id, self._scene.environment_revision
         ):
@@ -321,6 +332,7 @@ class StaticEnvironmentOwner:
         payload = {
             "schema_version": self.SCHEMA_VERSION,
             "owner_id": self.owner_id,
+            "world_id": self.world_id,
             "last_accepted_correlation": (
                 None if self._last_accepted_correlation is None else {
                     "world_id": self._last_accepted_correlation.world_id,
@@ -370,7 +382,7 @@ class StaticEnvironmentOwner:
         try:
             payload: Any = json.loads(encoded)
             if not isinstance(payload, dict) or set(payload) != {
-                "schema_version", "owner_id", "last_accepted_correlation", "scene"
+                "schema_version", "owner_id", "world_id", "last_accepted_correlation", "scene"
             }:
                 raise ValueError("invalid checkpoint fields")
             if type(payload["schema_version"]) is not int or payload["schema_version"] != cls.SCHEMA_VERSION:
@@ -445,9 +457,12 @@ class StaticEnvironmentOwner:
             owner_id = _identity(payload["owner_id"], "owner_id")
             if project_static_scene(scene) != scene:
                 raise ValueError("invalid static Environment checkpoint fields")
-            restored = cls(scene, owner_id)
+            world_id = _identity(payload["world_id"], "world_id")
+            restored = cls(scene, owner_id, world_id=world_id)
             if raw_correlation is not None:
                 correlation = PhysicalStepCorrelation(**raw_correlation)
+                if correlation.world_id != world_id:
+                    raise ValueError("checkpoint correlation does not match bound World identity")
                 if (correlation.environment_id, correlation.environment_revision) != (
                     scene.environment_id, scene.environment_revision
                 ):

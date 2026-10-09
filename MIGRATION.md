@@ -510,7 +510,7 @@ migration ratification of 2026-10-09 (closed Environment checkpoint schema;
 reject unknown fields); it is not a compatibility promise for historical
 source payloads.
 
-### Static sphere scene and checkpoint v3
+### Static sphere scene and checkpoint v4
 
 The bounded static physical-scene capability now owns sphere geometry through
 `StaticPhysicalScene.spheres`; generated spheres are no longer a parallel
@@ -520,11 +520,11 @@ universal Environment scene contract, solver contract, or claim about materials,
 mass, dynamics, or scientific suitability.
 
 Procedural scene genesis records the explicit seed, generator identity and
-revision, plus the generator-specific configuration as provenance. The v3
-owner checkpoint persists both this provenance and the authoritative geometry;
-restore uses the stored geometry and does not rerun a generator. The closed v3
-decoder rejects v2 checkpoints and unknown envelope/geometry fields; no v2
-compatibility decoder is provided. Provenance configuration is an opaque JSON
+revision, plus the generator-specific configuration as provenance. The v4
+owner checkpoint persists this provenance, authoritative geometry, and an
+explicit World attachment; restore uses the stored geometry and does not rerun
+a generator. The closed v4 decoder rejects earlier checkpoint versions and
+unknown envelope/geometry fields; no compatibility decoder is provided. Provenance configuration is an opaque JSON
 object to checkpoint restoration and is not validated against the current
 generator implementation.
 
@@ -533,8 +533,8 @@ generator implementation.
 | Target element | Disposition | Target path | Boundary / evidence |
 | --- | --- | --- | --- |
 | One stable movable-object position in an explicitly described frame | REWRITE / target-authored capability | `src/environment/dynamic_state.py::DynamicObjectState` | Position values are metres in a persisted `FrameDescriptor`. This is a bounded state fixture, not a general Environment ontology or solver contract. |
-| Candidate validation and state adoption | REWRITE / target-authored owner boundary | `DynamicEnvironmentOwner.validate_and_adopt` | Requires World/step/Environment correlation, active Environment revision, next source causal tick, stable object identity and the same declared frame. Invalid candidates do not mutate owner state. |
-| Owner checkpoint and restore | REWRITE / target-authored checkpoint | `DynamicEnvironmentOwner.checkpoint_bytes` / `from_checkpoint_bytes` | Closed v1 schema persists Environment identity/revision, explicit frame, object identity/position, and last accepted correlation. Unknown fields and unsupported versions are rejected. |
+| Candidate validation and state adoption | REWRITE / target-authored owner boundary | `DynamicEnvironmentOwner.validate_and_adopt` | Validates owner-local correlation derived from World step context, active Environment revision, next source causal tick, stable object identity and the same declared frame; this local value is not proof of World authorization. Invalid candidates do not mutate owner state. |
+| Owner checkpoint and restore | REWRITE / target-authored checkpoint | `DynamicEnvironmentOwner.checkpoint_bytes` / `from_checkpoint_bytes` | Closed v2 schema persists the World attachment, Environment identity/revision, explicit frame, object identity/position, and last accepted correlation. Unknown fields and unsupported versions are rejected. |
 | World causal commit and restore-continuation integration | REWRITE / local integration evidence | workspace `tests/integration/test_environment_dynamic_causal_step.py` | Exercises deterministic candidate adoption, committed owner reference, restore plus another step, and stale-candidate recovery-required behavior using the current World runtime. This workspace test remains local and is not committed here. |
 
 The integration candidate is a deterministic fixture input. This slice does not
@@ -542,3 +542,18 @@ implement or validate environmental dynamics, a physical law, solver behavior,
 calibration, material properties, scientific equivalence, production crash or
 power-loss recovery, or the complete Biopeia physical vertical slice. The
 historical hex/environment runtime and tests are not inputs to this capability.
+
+### World-bound Environment owner adoption — issue #37
+
+| Target element | Disposition | Target path | Boundary / evidence |
+| --- | --- | --- | --- |
+| Static and dynamic Environment owner attachment to a World | REWRITE / target-authored contract | `src/environment/static_scene.py::StaticEnvironmentOwner`, `src/environment/dynamic_state.py::DynamicEnvironmentOwner` | Each owner receives one explicit `world_id` at construction and persists it in a closed checkpoint, including before the first accepted transition. World rebinding is not an ordinary step and is not implemented here. |
+| Owner-local physical-step correlation | REWRITE / narrowed contract | `PhysicalStepCorrelation`, `validate_and_adopt` | Values correlate owner candidates and are not proof of World authorization. An integration adapter must derive expected owner-local values from one World-issued `PhysicalStepContext`; these owner APIs do not authenticate an arbitrary caller or import another domain's type. |
+| Validation evidence | REWRITE / tests | `tests/test_static_scene.py`, `tests/test_dynamic_state.py` | Tests reject a matching candidate/expected correlation from a different World, and reject checkpoint correlation whose World differs from the persisted owner attachment. This proves local binding checks, not authorization or a production adapter. |
+
+The Environment and World owner identities remain distinct. Their registration
+relationship belongs to the World roster. This bounded change does not add
+cryptographic authentication, cross-process security, a shared correlation
+type, a production solver adapter, or at-most-once adoption semantics. The
+workspace integration fixture is separately maintained outside this Git
+repository and is not versioned by this PR.
