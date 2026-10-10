@@ -16,6 +16,16 @@ checkpoints persist the World attachment, including before the first adopted
 step. These checkpoint schema changes are intentionally strict; earlier
 checkpoint versions are not accepted through compatibility decoding.
 
+Checkpointable owners expose `verify_restoration(reference)` to compare an
+already restored owner object with an independently supplied committed owner
+reference. The reference binds owner identity, schema, and SHA-256 of the
+canonical owner checkpoint; owners that persist World or Environment bindings
+also require those exact identities/revisions. This verifies owner state only:
+it is not a durable store, a World commit decision, or a power-loss guarantee.
+The World runtime must pass the committed reference and the restored owner
+state to this boundary before resuming; this repository-level API does not by
+itself change World's restore orchestration.
+
 `FiniteResourceState` owns a finite environmental quantity and its local scalar field. The resource transfer limit/quantity semantics do not imply physical equivalence to endogenous mechanisms. Physics-engine geometry/contact execution and Lab runtime intervention semantics remain outside this repository.
 
 The former extracted hex-grid fields, cell-based terrain/hydrology, and coupled `EnvironmentState`/field-law APIs were removed because they did not establish a justified TARGET contract. There is no hex-to-3D conversion or backwards-compatibility shim. Procedural sphere placement is target-authored and carries no cognitive labels; it makes no non-overlap or scientific-validity claim. See [`MIGRATION.md`](MIGRATION.md) for scoped provenance, evidence, and limitations; the overall source inventory remains open.

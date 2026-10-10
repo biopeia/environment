@@ -558,6 +558,24 @@ type, a production solver adapter, or at-most-once adoption semantics. The
 workspace integration fixture is separately maintained outside this Git
 repository and is not versioned by this PR.
 
+### Owner-bound restoration verification — issue #41
+
+| Target element | Disposition | Target path | Boundary / evidence |
+| --- | --- | --- | --- |
+| Independent committed owner restoration reference | REWRITE / target-authored contract | `src/environment/restoration.py::OwnerRestorationReference` | Captures owner identity, schema version, canonical checkpoint SHA-256, and optional Environment/World bindings from the committed-cut authority. Partial Environment identity/revision is rejected. |
+| Owner-side restored-state verification | REWRITE / target-authored contract | `verify_restoration` on `StaticEnvironmentOwner`, `DynamicEnvironmentOwner`, `IdentifiedFiniteResource`, and `IdentifiedFiniteScalarField` | Compares the restored object's canonical checkpoint digest and declared identities to the supplied reference. Static/dynamic owners require Environment identity/revision and World binding; scalar fields require Environment identity/revision; identified resource state has no Environment/World binding in its current owner schema and rejects such a supplied binding. Rejections do not mutate owner state. |
+| Durable World restore orchestration | DEFER / cross-owner follow-up | World restore integration | Current World `OwnerCheckpointContract` invokes `verify_restoration(encoded, owner_identity, schema_version)` after a callback whose restored objects are not returned to the owner contract. It does not supply the independent committed digest or Environment/World reference fields to Environment's new boundary. World integration must be updated before claiming that World restoration is verified through this API. |
+
+This API validates owner state against a committed reference when called with
+the restored owner object and independently obtained reference. World remains
+the authority for selecting the committed cut and providing that reference.
+The check is not a durable store, storage backend, commit protocol, or
+power-loss guarantee. The current Environment PR does not claim the cross-owner
+restore integration criterion is complete; `environment#41` must remain open
+until World passes its exact committed owner reference and restored state to
+this boundary and integration tests demonstrate valid continuation and
+rejection without mutation.
+
 ### Ratified finite scalar-field sensor fixture — Environment #45
 
 | Target element | Disposition | Target path | Boundary / evidence |

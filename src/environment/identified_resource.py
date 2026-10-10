@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from .resource import FiniteResourceState
+from .restoration import OwnerRestorationReference, verify_restored_owner
 from .static_scene import FrameDescriptor, PhysicalStepCorrelation
 
 
@@ -40,6 +41,15 @@ class IdentifiedFiniteResource:
             "state": self.state.checkpoint(),
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+
+    def verify_restoration(self, reference: OwnerRestorationReference) -> None:
+        """Verify this restored resource against an independent committed ref."""
+        verify_restored_owner(
+            checkpoint=self.checkpoint_bytes(),
+            owner_identity=self.resource_id,
+            schema_version=self.OWNER_SCHEMA,
+            reference=reference,
+        )
 
     @classmethod
     def from_checkpoint_bytes(cls, encoded: bytes) -> IdentifiedFiniteResource:
@@ -75,12 +85,6 @@ class IdentifiedFiniteResource:
         except (TypeError, ValueError):
             return False
         return checkpoint.resource_id == owner_identity
-
-    @classmethod
-    def verify_restoration(cls, encoded: bytes, owner_identity: str, schema_version: str) -> bool:
-        """Verify a restored checkpoint through the same owner codec boundary."""
-        return cls.validate_checkpoint(encoded, owner_identity, schema_version)
-
 
 @dataclass(frozen=True, slots=True)
 class FiniteScalarFieldSample:
@@ -222,6 +226,18 @@ class IdentifiedFiniteScalarField:
             "state": self.state.checkpoint(),
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+
+    def verify_restoration(self, reference: OwnerRestorationReference) -> None:
+        """Verify this restored field against an independent committed ref."""
+        verify_restored_owner(
+            checkpoint=self.checkpoint_bytes(),
+            owner_identity=self.resource_id,
+            schema_version=self.OWNER_SCHEMA,
+            reference=reference,
+            environment_id=self.environment_id,
+            environment_revision=self.environment_revision,
+            requires_environment_binding=True,
+        )
 
     @classmethod
     def from_checkpoint_bytes(cls, encoded: bytes) -> IdentifiedFiniteScalarField:
