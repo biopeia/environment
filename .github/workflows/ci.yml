@@ -15,3 +15,32 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install . pytest
       - run: python -m pytest
+
+  build-and-test-distributions:
+    name: Build and test distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip build
+      - run: python -m build --wheel --sdist --outdir "$RUNNER_TEMP/dist"
+      - name: Install and test each built distribution in isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/installed-check"
+          for artifact in "$RUNNER_TEMP"/dist/*; do
+            name="$(basename "$artifact")"
+            env_dir="$RUNNER_TEMP/venv-${name//[^a-zA-Z0-9]/-}"
+            check_dir="$RUNNER_TEMP/installed-check/${name//[^a-zA-Z0-9]/-}"
+            python -m venv "$env_dir"
+            "$env_dir/bin/python" -m pip install --upgrade pip pytest
+            "$env_dir/bin/python" -m pip install "$artifact"
+            mkdir -p "$check_dir"
+            (
+              cd "$check_dir"
+              "$env_dir/bin/python" -m pytest --import-mode=importlib "$GITHUB_WORKSPACE/tests"
+            )
+          done
