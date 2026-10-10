@@ -235,19 +235,23 @@ def test_checkpoint_rejects_boolean_schema_version():
         StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
 
 
-def test_checkpoint_v4_persists_spheres_and_rejects_v3_without_compatibility():
-    sphere = StaticSphere("sphere-a", (1.25, -2.0, 0.5), 0.2, "environment-frame")
-    owner = StaticEnvironmentOwner(scene(spheres=(sphere,)), "env-owner", world_id="world-1")
+def test_checkpoint_v5_persists_contact_properties_and_rejects_v4_without_compatibility():
+    sphere = StaticSphere("sphere-a", (1.25, -2.0, 0.5), 0.2, "environment-frame", 0.25)
+    ground = StaticGroundPlane("ground", (0, 0, 1), 0.0, 0.0)
+    owner = StaticEnvironmentOwner(
+        scene(objects=(ground,), spheres=(sphere,)), "env-owner", world_id="world-1"
+    )
     encoded = owner.checkpoint_bytes()
     payload = json.loads(encoded)
-    assert payload["schema_version"] == 4
+    assert payload["schema_version"] == 5
     assert payload["scene"]["spheres"] == [
         {"object_id": "sphere-a", "center_m": [1.25, -2.0, 0.5], "radius_m": 0.2,
-         "frame_id": "environment-frame"}
+         "frame_id": "environment-frame", "sliding_friction_coefficient": 0.25}
     ]
     restored = StaticEnvironmentOwner.from_checkpoint_bytes(encoded)
     assert restored.scene.spheres == (sphere,)
-    payload["schema_version"] = 3
+    assert restored.scene.objects == (ground,)
+    payload["schema_version"] = 4
     with pytest.raises(ValueError, match="invalid static Environment checkpoint"):
         StaticEnvironmentOwner.from_checkpoint_bytes(json.dumps(payload).encode())
 

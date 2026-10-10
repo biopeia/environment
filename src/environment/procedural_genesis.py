@@ -65,6 +65,7 @@ class EnvironmentGenesisConfig:
     sphere_count: int
     minimum_radius_m: float
     maximum_radius_m: float
+    sphere_sliding_friction_coefficient: float
 
     def __post_init__(self) -> None:
         _identity(self.environment_id, "environment_id")
@@ -96,6 +97,15 @@ class EnvironmentGenesisConfig:
             object.__setattr__(self, field_name, value)
         if self.minimum_radius_m > self.maximum_radius_m:
             raise ValueError("minimum_radius_m must not exceed maximum_radius_m")
+        if isinstance(self.sphere_sliding_friction_coefficient, bool):
+            raise ValueError("sphere_sliding_friction_coefficient must be finite and non-negative")
+        try:
+            friction = float(self.sphere_sliding_friction_coefficient)
+        except (TypeError, ValueError, OverflowError) as error:
+            raise ValueError("sphere_sliding_friction_coefficient must be finite and non-negative") from error
+        if not math.isfinite(friction) or friction < 0.0:
+            raise ValueError("sphere_sliding_friction_coefficient must be finite and non-negative")
+        object.__setattr__(self, "sphere_sliding_friction_coefficient", friction)
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,12 +162,14 @@ def _canonical_spec(spec: EnvironmentGenesisSpec) -> bytes:
                 "object_id": config.ground_plane.object_id,
                 "normal": config.ground_plane.normal,
                 "offset_m": config.ground_plane.offset_m,
+                "sliding_friction_coefficient": config.ground_plane.sliding_friction_coefficient,
             },
             "bounds_min_m": config.bounds_min_m,
             "bounds_max_m": config.bounds_max_m,
             "sphere_count": config.sphere_count,
             "minimum_radius_m": config.minimum_radius_m,
             "maximum_radius_m": config.maximum_radius_m,
+            "sphere_sliding_friction_coefficient": config.sphere_sliding_friction_coefficient,
         },
     }
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
@@ -191,7 +203,10 @@ def generate_procedural_environment(spec: EnvironmentGenesisSpec) -> ProceduralE
         unit = tuple(_unit_interval(digest, axis) for axis in range(4))
         center = tuple(lo + (hi - lo) * unit[axis] for axis, (lo, hi) in enumerate(zip(lower, upper, strict=True)))
         radius = config.minimum_radius_m + (config.maximum_radius_m - config.minimum_radius_m) * unit[3]
-        spheres.append(StaticSphere(f"sphere-{index:06d}", center, radius, config.frame.frame_id))
+        spheres.append(StaticSphere(
+            f"sphere-{index:06d}", center, radius, config.frame.frame_id,
+            config.sphere_sliding_friction_coefficient,
+        ))
     genesis_configuration = json.loads(_canonical_spec(spec))["configuration"]
     scene = StaticPhysicalScene(
         environment_id=config.environment_id,

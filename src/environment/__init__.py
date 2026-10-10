@@ -19,6 +19,7 @@ from environment.resource import FiniteResourceState
 from environment.restoration import OwnerRestorationReference
 from environment.static_scene import (
     EnvironmentGenesisProvenance,
+    EnvironmentPhysicalProjection,
     FrameDescriptor,
     PhysicalStepCorrelation,
     StaticEnvironmentOwner,
@@ -34,6 +35,7 @@ __all__ = [
     "GENERATOR_REVISION",
     "EnvironmentGenesisConfig",
     "EnvironmentGenesisProvenance",
+    "EnvironmentPhysicalProjection",
     "EnvironmentGenesisSpec",
     "DynamicEnvironmentCandidate",
     "DynamicEnvironmentOwner",
