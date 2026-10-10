@@ -8,6 +8,7 @@ generation. All lengths are metres and gravity is metres per second squared.
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -77,6 +78,7 @@ class StaticGroundPlane:
     object_id: str
     normal: tuple[float, float, float]
     offset_m: float = 0.0
+    sliding_friction_coefficient: float | None = None
 
     def __post_init__(self) -> None:
         _identity(self.object_id, "object_id")
@@ -94,6 +96,12 @@ class StaticGroundPlane:
         if not math.isfinite(offset):
             raise ValueError("offset_m must be finite")
         object.__setattr__(self, "offset_m", offset)
+        if self.sliding_friction_coefficient is not None:
+            object.__setattr__(
+                self,
+                "sliding_friction_coefficient",
+                _friction_coefficient(self.sliding_friction_coefficient),
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +112,7 @@ class StaticSphere:
     center_m: tuple[float, float, float]
     radius_m: float
     frame_id: str
+    sliding_friction_coefficient: float | None = None
 
     def __post_init__(self) -> None:
         _identity(self.object_id, "object_id")
@@ -119,6 +128,24 @@ class StaticSphere:
         if not math.isfinite(radius) or radius <= 0:
             raise ValueError("radius_m must be finite and positive")
         object.__setattr__(self, "radius_m", radius)
+        if self.sliding_friction_coefficient is not None:
+            object.__setattr__(
+                self,
+                "sliding_friction_coefficient",
+                _friction_coefficient(self.sliding_friction_coefficient),
+            )
+
+
+def _friction_coefficient(value: float) -> float:
+    if isinstance(value, bool):
+        raise ValueError("sliding_friction_coefficient must be finite and non-negative")
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError("sliding_friction_coefficient must be finite and non-negative") from error
+    if not math.isfinite(result) or result < 0.0:
+        raise ValueError("sliding_friction_coefficient must be finite and non-negative")
+    return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,6 +278,71 @@ class StaticPhysicalScene:
 
 
 @dataclass(frozen=True, slots=True)
+class EnvironmentPhysicalProjection:
+    """Revision- and World-step-bound Environment input for solver adapters.
+
+    This is an owner projection, not a solver configuration or solver result.
+    Its quantity-specific field names declare metres, metres per second squared,
+    and dimensionless sliding-friction coefficients. The coefficient values are
+    Environment-authored model inputs, not calibrated material measurements.
+    """
+
+    correlation: PhysicalStepCorrelation
+    scene: StaticPhysicalScene
+    geometry_revision: str
+    length_unit: str = "m"
+    gravity_unit: str = "m/s^2"
+    sliding_friction_unit: str = "1"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.correlation, PhysicalStepCorrelation):
+            raise ValueError("correlation must be a World-derived Environment correlation")
+        if not isinstance(self.scene, StaticPhysicalScene):
+            raise ValueError("scene must be StaticPhysicalScene")
+        if (self.correlation.environment_id, self.correlation.environment_revision) != (
+            self.scene.environment_id,
+            self.scene.environment_revision,
+        ):
+            raise ValueError("projection correlation does not match Environment identity/revision")
+        if self.length_unit != "m" or self.gravity_unit != "m/s^2" or self.sliding_friction_unit != "1":
+            raise ValueError("unsupported Environment physical projection units")
+        if any(item.sliding_friction_coefficient is None for item in (*self.scene.objects, *self.scene.spheres)):
+            raise ValueError("every projected geometry item requires explicit sliding friction")
+        expected = _geometry_revision(self.scene)
+        if self.geometry_revision != expected:
+            raise ValueError("geometry_revision does not match projected Environment geometry")
+
+
+def _geometry_revision(scene: StaticPhysicalScene) -> str:
+    payload = {
+        "frame": {
+            "frame_id": scene.frame.frame_id,
+            "parent_frame_id": scene.frame.parent_frame_id,
+            "origin_m": scene.frame.origin_m,
+            "x_axis_in_parent": scene.frame.x_axis_in_parent,
+            "y_axis_in_parent": scene.frame.y_axis_in_parent,
+            "z_axis_in_parent": scene.frame.z_axis_in_parent,
+            "handedness": scene.frame.handedness,
+            "up_axis": scene.frame.up_axis,
+        },
+        "gravity_m_s2": scene.gravity_m_s2,
+        "objects": [
+            {"object_id": item.object_id, "normal": item.normal, "offset_m": item.offset_m,
+             "sliding_friction_coefficient": item.sliding_friction_coefficient}
+            for item in scene.objects
+        ],
+        "spheres": [
+            {"object_id": item.object_id, "center_m": item.center_m, "radius_m": item.radius_m,
+             "frame_id": item.frame_id,
+             "sliding_friction_coefficient": item.sliding_friction_coefficient}
+            for item in scene.spheres
+        ],
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
 class StaticSceneCandidate:
     """Candidate that an owner may adopt only if static scene truth is unchanged."""
 
@@ -277,8 +369,8 @@ def project_static_scene(scene: StaticPhysicalScene) -> StaticPhysicalScene:
 class StaticEnvironmentOwner:
     """Small owner boundary for a static scene and its recoverable step marker."""
 
-    SCHEMA_VERSION = 4
-    CHECKPOINT_SCHEMA = "environment-static-scene-v4"
+    SCHEMA_VERSION = 5
+    CHECKPOINT_SCHEMA = "environment-static-scene-v5"
 
     def __init__(self, scene: StaticPhysicalScene, owner_id: str, *, world_id: str) -> None:
         self._scene = project_static_scene(scene)
@@ -297,6 +389,32 @@ class StaticEnvironmentOwner:
     @property
     def scene(self) -> StaticPhysicalScene:
         return self._scene
+
+    def project_physical_step(
+        self, correlation: PhysicalStepCorrelation
+    ) -> EnvironmentPhysicalProjection:
+        """Project this owner's physical state for one World-authorized step.
+
+        Correlation is supplied by the integration boundary and is checked
+        against this owner's World attachment and Environment revision. This
+        projection does not authenticate World or adopt resulting state.
+        """
+        if not isinstance(correlation, PhysicalStepCorrelation):
+            raise ValueError("correlation must be World-derived Environment correlation")
+        if correlation.world_id != self.world_id:
+            raise ValueError("physical projection correlation does not match bound World")
+        if (correlation.environment_id, correlation.environment_revision) != (
+            self.scene.environment_id,
+            self.scene.environment_revision,
+        ):
+            raise ValueError("physical projection correlation does not match active Environment revision")
+        if correlation.causal_tick != self.last_adopted_tick + 1:
+            raise ValueError("physical projection correlation is stale or not the next causal tick")
+        return EnvironmentPhysicalProjection(
+            correlation=correlation,
+            scene=project_static_scene(self.scene),
+            geometry_revision=_geometry_revision(self.scene),
+        )
 
     @property
     def last_adopted_tick(self) -> int:
@@ -359,12 +477,14 @@ class StaticEnvironmentOwner:
                 },
                 "gravity_m_s2": list(self._scene.gravity_m_s2),
                 "objects": [
-                    {"object_id": item.object_id, "normal": list(item.normal), "offset_m": item.offset_m}
+                    {"object_id": item.object_id, "normal": list(item.normal), "offset_m": item.offset_m,
+                     "sliding_friction_coefficient": item.sliding_friction_coefficient}
                     for item in self._scene.objects
                 ],
                 "spheres": [
                     {"object_id": item.object_id, "center_m": list(item.center_m),
-                     "radius_m": item.radius_m, "frame_id": item.frame_id}
+                     "radius_m": item.radius_m, "frame_id": item.frame_id,
+                     "sliding_friction_coefficient": item.sliding_friction_coefficient}
                     for item in self._scene.spheres
                 ],
                 "genesis": None if self._scene.genesis is None else {
@@ -417,14 +537,18 @@ class StaticEnvironmentOwner:
                 raise ValueError("invalid frame checkpoint fields")
             raw_objects = scene_data["objects"]
             if not isinstance(raw_objects, list) or any(
-                not isinstance(item, dict) or set(item) != {"object_id", "normal", "offset_m"}
+                not isinstance(item, dict) or set(item) != {
+                    "object_id", "normal", "offset_m", "sliding_friction_coefficient"
+                }
                 for item in raw_objects
             ):
                 raise ValueError("invalid object checkpoint fields")
             raw_spheres = scene_data["spheres"]
             if not isinstance(raw_spheres, list) or any(
                 not isinstance(item, dict)
-                or set(item) != {"object_id", "center_m", "radius_m", "frame_id"}
+                or set(item) != {
+                    "object_id", "center_m", "radius_m", "frame_id", "sliding_friction_coefficient"
+                }
                 for item in raw_spheres
             ):
                 raise ValueError("invalid sphere checkpoint fields")
@@ -499,6 +623,6 @@ class StaticEnvironmentOwner:
 
 
 __all__ = [
-    "EnvironmentGenesisProvenance", "FrameDescriptor", "PhysicalStepCorrelation", "StaticEnvironmentOwner", "StaticGroundPlane", "StaticSphere",
+    "EnvironmentGenesisProvenance", "EnvironmentPhysicalProjection", "FrameDescriptor", "PhysicalStepCorrelation", "StaticEnvironmentOwner", "StaticGroundPlane", "StaticSphere",
     "StaticPhysicalScene", "StaticSceneCandidate", "project_static_scene",
 ]

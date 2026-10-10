@@ -591,3 +591,18 @@ World causal integration, a complete sensorimotor loop, or evidence that the
 signal has organism-level meaning. Historical `PhysicalResource` is not a
 TARGET code input; this is a fresh, narrowly scoped fixture under the ratified
 owner contract.
+
+### Revision-bound Environment physical projection — issue #49
+
+| Target element | Disposition | Target path | Boundary / evidence |
+| --- | --- | --- | --- |
+| Owner-authored projection for one World physical step | REWRITE / target-authored capability | `StaticEnvironmentOwner.project_physical_step` and `EnvironmentPhysicalProjection` | Binds Environment identity/revision, World/tick/step correlation, declared frame, metre geometry, gravity in m/s², stable geometry IDs, and a deterministic geometry digest. It is a projection only, not solver configuration, execution, result adoption, or proof that World authorized the supplied correlation. |
+| Contact property needed by the bounded solver path | REWRITE / explicit Environment state | `StaticGroundPlane.sliding_friction_coefficient`, `StaticSphere.sliding_friction_coefficient` | Each geometry item used by the physical projection must provide an explicit finite non-negative dimensionless value. These are Environment-authored model inputs, not calibrated measurements or universal defaults. Missing values fail closed. |
+| Owner checkpoint | REWRITE / strict schema | `StaticEnvironmentOwner` checkpoint v5 | The contact inputs are persisted and hashed as geometry. The decoder rejects v4 and unknown fields; no compatibility decoder is provided. |
+| Validation | REWRITE / target tests | `tests/test_environment_physical_projection.py`, `tests/test_static_scene.py`, `tests/test_genesis.py` | Covers World/Environment correlation, units, missing contact rejection, stable IDs/digest, owner checkpoint/restore equivalence, and changed contact input changing geometry revision. |
+
+This slice gives World a production owner projection to consume; it does not
+implement the World solver adapter, choose MuJoCo execution parameters, adopt
+solver results, or complete `world#29`, `world#86`, or the end-to-end migration
+acceptance run. The coefficient values are explicit fixture/model configuration
+only and make no calibration or scientific-validity claim.

@@ -38,12 +38,13 @@ def _spec(seed: int = 42) -> EnvironmentGenesisSpec:
             environment_revision="revision-1",
             frame=_frame(),
             gravity_m_s2=(0.0, 0.0, -9.81),
-            ground_plane=StaticGroundPlane("ground", (0.0, 0.0, 1.0), 0.0),
+            ground_plane=StaticGroundPlane("ground", (0.0, 0.0, 1.0), 0.0, 0.0),
             bounds_min_m=(-2.0, -1.0, 0.0),
             bounds_max_m=(2.0, 1.0, 3.0),
             sphere_count=12,
             minimum_radius_m=0.05,
             maximum_radius_m=0.25,
+            sphere_sliding_friction_coefficient=0.0,
         ),
     )
 
