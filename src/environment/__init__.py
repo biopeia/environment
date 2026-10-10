@@ -1,7 +1,11 @@
 """Environment-owned external state and physical-scene capabilities."""
 
 from environment.dynamic_state import DynamicEnvironmentCandidate, DynamicEnvironmentOwner, DynamicObjectState
-from environment.identified_resource import IdentifiedFiniteResource
+from environment.identified_resource import (
+    FiniteScalarFieldSample,
+    IdentifiedFiniteResource,
+    IdentifiedFiniteScalarField,
+)
 from environment.procedural_genesis import (
     GENERATOR_ID,
     GENERATOR_REVISION,
@@ -34,8 +38,10 @@ __all__ = [
     "DynamicEnvironmentOwner",
     "DynamicObjectState",
     "FiniteResourceState",
+    "FiniteScalarFieldSample",
     "FrameDescriptor",
     "IdentifiedFiniteResource",
+    "IdentifiedFiniteScalarField",
     "PhysicalSphere",
     "PhysicalStepCorrelation",
     "ProceduralEnvironmentScene",
