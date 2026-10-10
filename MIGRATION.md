@@ -557,3 +557,19 @@ cryptographic authentication, cross-process security, a shared correlation
 type, a production solver adapter, or at-most-once adoption semantics. The
 workspace integration fixture is separately maintained outside this Git
 repository and is not versioned by this PR.
+
+### Ratified finite scalar-field sensor fixture — Environment #45
+
+| Target element | Disposition | Target path | Boundary / evidence |
+| --- | --- | --- | --- |
+| Finite scalar-field identity and revision | REWRITE / target-authored capability | `src/environment/identified_resource.py::IdentifiedFiniteScalarField` | New closed v1 checkpoint stores stable `resource_id`, `field_revision`, `environment_id`, `environment_revision`, explicit `frame_id`, and finite resource state. For this wrapper only, wrapped `state.position`, `state.radius`, and `state.field_radius` are explicitly interpreted in metres in `frame_id`; this does not redefine units for other `FiniteResourceState` uses. Sampling rejects a mismatched Environment identity/revision. It is separate from the existing material-transfer `IdentifiedFiniteResource` contract; no old API or checkpoint was changed for compatibility. |
+| Scalar field sample | REWRITE / target-authored capability | `src/environment/identified_resource.py::FiniteScalarFieldSample` | Reports a dimensionless quantity (`unit = 1`), range `[0, 1]`, a sampling point in frame-local metres, resource/field identity, Environment identity/revision, and World source-cut correlation. The sample and field-state length values share the declared wrapper frame and metre unit. The squared radial profile is fixture-specific, not a general sensing law or scientific efficacy claim. |
+| Causal sampling correlation | REWRITE / owner projection | `IdentifiedFiniteScalarField.sample_field` | Copies the `PhysicalStepCorrelation` supplied by the integration boundary. This value does not authenticate World authorization; World-side integration must independently derive and validate correlation. |
+| Validation | REWRITE / target contract tests | `tests/test_identified_resource.py` | Covers profile value, depletion and boundary zero, identity/revision/frame/correlation, malformed sampling, range, and strict checkpoint shape. Validation from Environment base `8f02abed5e9eae1ad27bafedee1800ef12476b67`: 82 package tests passed; `uv build --no-sources` produced sdist and wheel. |
+
+This slice supplies only the Environment scalar field. It does not implement
+Embodiment receptor ownership, Modality transduction, Organism signal intake,
+World causal integration, a complete sensorimotor loop, or evidence that the
+signal has organism-level meaning. Historical `PhysicalResource` is not a
+TARGET code input; this is a fresh, narrowly scoped fixture under the ratified
+owner contract.
