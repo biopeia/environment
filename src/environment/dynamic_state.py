@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from environment.static_scene import FrameDescriptor, PhysicalStepCorrelation
+from environment.restoration import OwnerRestorationReference, verify_restored_owner
 
 
 def _identity(value: str, name: str) -> str:
@@ -186,6 +187,20 @@ class DynamicEnvironmentOwner:
             },
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+
+    def verify_restoration(self, reference: OwnerRestorationReference) -> None:
+        """Verify this restored owner against an independent committed reference."""
+        verify_restored_owner(
+            checkpoint=self.checkpoint_bytes(),
+            owner_identity=self.owner_id,
+            schema_version=self.CHECKPOINT_SCHEMA,
+            reference=reference,
+            environment_id=self.environment_id,
+            environment_revision=self.environment_revision,
+            world_id=self.world_id,
+            requires_environment_binding=True,
+            requires_world_binding=True,
+        )
 
     @classmethod
     def from_checkpoint_bytes(cls, encoded: bytes) -> DynamicEnvironmentOwner:

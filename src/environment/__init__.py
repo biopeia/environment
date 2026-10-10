@@ -16,6 +16,7 @@ from environment.procedural_genesis import (
 )
 from environment.physical import PhysicalSphere, project_resource_geometry
 from environment.resource import FiniteResourceState
+from environment.restoration import OwnerRestorationReference
 from environment.static_scene import (
     EnvironmentGenesisProvenance,
     FrameDescriptor,
@@ -44,6 +45,7 @@ __all__ = [
     "IdentifiedFiniteScalarField",
     "PhysicalSphere",
     "PhysicalStepCorrelation",
+    "OwnerRestorationReference",
     "ProceduralEnvironmentScene",
     "StaticEnvironmentOwner",
     "StaticGroundPlane",
