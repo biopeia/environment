@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from .resource import FiniteResourceState
 from .static_scene import FrameDescriptor, PhysicalStepCorrelation
@@ -137,7 +137,12 @@ class IdentifiedFiniteScalarField:
 
     This is deliberately separate from ``IdentifiedFiniteResource`` so adding
     the sensing fixture does not change the existing material-transfer owner
-    contract or its checkpoint/API.
+    contract or its checkpoint/API. For this wrapper only, ``state.position``,
+    ``state.radius`` and ``state.field_radius`` are interpreted as coordinates
+    and lengths in metres in ``frame_id``. The wrapped state stores numeric
+    values only; this explicit binding is what makes distance/radius ratios and
+    caller ``point_m`` samples dimensionally coherent. It does not redefine
+    units for other uses of ``FiniteResourceState``.
     """
 
     resource_id: str
@@ -150,6 +155,7 @@ class IdentifiedFiniteScalarField:
     CHECKPOINT_TYPE = "biopeia.environment.identified-finite-scalar-field"
     CHECKPOINT_VERSION = 1
     OWNER_SCHEMA = "environment-identified-finite-scalar-field-v1"
+    coordinate_unit: ClassVar[str] = "m"
 
     def __post_init__(self) -> None:
         for name in ("resource_id", "field_revision", "environment_id", "environment_revision", "frame_id"):
@@ -166,7 +172,11 @@ class IdentifiedFiniteScalarField:
         frame: FrameDescriptor,
         correlation: PhysicalStepCorrelation,
     ) -> FiniteScalarFieldSample:
-        """Sample the fixture-specific squared radial field in frame-local metres."""
+        """Sample the fixture profile using frame-local metre coordinates.
+
+        The field state's position and radius values use the same ``frame_id``
+        and metre unit as ``point_m``. The returned scalar is dimensionless.
+        """
         if not isinstance(frame, FrameDescriptor) or frame.frame_id != self.frame_id:
             raise ValueError("sampling frame must match the resource field frame")
         if not isinstance(correlation, PhysicalStepCorrelation):

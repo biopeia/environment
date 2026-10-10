@@ -126,6 +126,8 @@ def test_scalar_field_uses_explicit_identity_range_frame_and_source_cut() -> Non
     )
     assert sample.frame_id == "environment.frame"
     assert sample.point_m == (1.0, 0.0, 0.0)
+    assert field.coordinate_unit == "m"
+    assert field.frame_id == sample.frame_id
     assert (sample.quantity_kind, sample.unit, sample.valid_range) == (
         "dimensionless_scalar_field", "1", (0.0, 1.0)
     )
