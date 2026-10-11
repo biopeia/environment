@@ -592,6 +592,23 @@ signal has organism-level meaning. Historical `PhysicalResource` is not a
 TARGET code input; this is a fresh, narrowly scoped fixture under the ratified
 owner contract.
 
+### Environment-authored observation projection — issue #53
+
+| Target element | Disposition | Target path | Boundary / evidence |
+| --- | --- | --- | --- |
+| Projection context and value | NEW TARGET CAPABILITY | `src/environment/identified_resource.py::EnvironmentObservationContext` and `FiniteScalarFieldObservationProjection` | Carries explicit World/source/target tick and physical-step correlation, Environment identity/revision, resource identity/field revision, frame-local metre sampling point, dimensionless quantity, unit `1`, and range `[0, 1]`. The context is caller-supplied correlation, not proof of a committed World cut. |
+| Owner-authored projection | NEW TARGET CAPABILITY | `IdentifiedFiniteScalarField.project_observation` | Samples the current Environment-owned field state at the explicit supplied location after the caller has adopted the target state. Environment validates its own identities/revisions and frame. World must independently match this projection to the committed cut and its owner references before Observation publication. |
+| Source disposition | No historical implementation migrated | Based on Environment target base `caa885a11ec0170717bb4b71d271ab171807197e`; existing TARGET `IdentifiedFiniteScalarField` from the #45 sensor fixture is the input capability. No Symbiont implementation/API is reused. | The pre-step `sample_field` remains a distinct source-step sample. This projection does not claim receptor identity, World commit, Observation delivery, or scientific meaning. |
+| Validation | TARGET contract tests | `tests/test_identified_resource.py` | Covers post-adoption current-state sampling, distinction from source-step sampling, target tick, world/step/resource/field/environment identities and revisions, frame, finite point, quantity/range and invalid target-tick progression. Exact candidate validation is recorded in Environment issue #53 and its linked PR. |
+
+This owner-local slice does not prove that an Environment state was actually
+adopted for the supplied target tick: the context is correlation data, not an
+adoption receipt. It does not prove World commit, cross-owner restoration,
+Observation publication, or the end-to-end acceptance cycle. Those remain
+World/Observation integration responsibilities tracked by
+[observation#26](https://github.com/biopeia/observation/issues/26) and
+[world#86](https://github.com/biopeia/world/issues/86).
+
 ### Revision-bound Environment physical projection — issue #49
 
 | Target element | Disposition | Target path | Boundary / evidence |
