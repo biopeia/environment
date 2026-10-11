@@ -40,7 +40,9 @@ class IdentifiedFiniteResource:
             "resource_id": self.resource_id,
             "state": self.state.checkpoint(),
         }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        return json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode()
 
     def verify_restoration(self, reference: OwnerRestorationReference) -> None:
         """Verify this restored resource against an independent committed ref."""
@@ -76,7 +78,9 @@ class IdentifiedFiniteResource:
         )
 
     @classmethod
-    def validate_checkpoint(cls, encoded: bytes, owner_identity: str, schema_version: str) -> bool:
+    def validate_checkpoint(
+        cls, encoded: bytes, owner_identity: str, schema_version: str
+    ) -> bool:
         """Validate recoverable owner bytes without issuing a World receipt."""
         if schema_version != cls.OWNER_SCHEMA:
             return False
@@ -85,6 +89,7 @@ class IdentifiedFiniteResource:
         except (TypeError, ValueError):
             return False
         return checkpoint.resource_id == owner_identity
+
 
 @dataclass(frozen=True, slots=True)
 class FiniteScalarFieldSample:
@@ -107,8 +112,13 @@ class FiniteScalarFieldSample:
 
     def __post_init__(self) -> None:
         for name in (
-            "resource_id", "field_revision", "world_id", "physical_step_id",
-            "environment_id", "environment_revision", "frame_id",
+            "resource_id",
+            "field_revision",
+            "world_id",
+            "physical_step_id",
+            "environment_id",
+            "environment_revision",
+            "frame_id",
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
@@ -133,6 +143,119 @@ class FiniteScalarFieldSample:
             or not 0.0 <= self.value <= 1.0
         ):
             raise ValueError("value must be finite and within [0, 1]")
+
+
+@dataclass(frozen=True, slots=True)
+class EnvironmentObservationContext:
+    """Owner-local correlation for a post-adoption field observation.
+
+    This is correlation data, not proof that World committed ``target_causal_tick``.
+    The caller must invoke the Environment projection only after the relevant
+    owner state has been adopted; World independently verifies the commit before
+    publishing any resulting projection.
+    """
+
+    world_id: str
+    source_causal_tick: int
+    target_causal_tick: int
+    physical_step_id: str
+    environment_id: str
+    environment_revision: str
+    resource_id: str
+    field_revision: str
+
+    def __post_init__(self) -> None:
+        for name in (
+            "world_id",
+            "physical_step_id",
+            "environment_id",
+            "environment_revision",
+            "resource_id",
+            "field_revision",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+            object.__setattr__(self, name, value.strip())
+        if (
+            type(self.source_causal_tick) is not int
+            or type(self.target_causal_tick) is not int
+            or self.source_causal_tick < 0
+            or self.target_causal_tick != self.source_causal_tick + 1
+        ):
+            raise ValueError("target causal tick must immediately follow source tick")
+
+
+@dataclass(frozen=True, slots=True)
+class FiniteScalarFieldObservationProjection:
+    """Environment-owned field sample at an explicit location and applicability.
+
+    The projection describes the Environment field's value at ``point_m`` for
+    the target causal applicability. It does not identify the receptor or prove
+    owner adoption or a World commit; Embodiment owns receptor identity and
+    World owns commit.
+    """
+
+    resource_id: str
+    field_revision: str
+    environment_id: str
+    environment_revision: str
+    world_id: str
+    source_causal_tick: int
+    target_causal_tick: int
+    physical_step_id: str
+    frame_id: str
+    point_m: tuple[float, float, float]
+    value: float
+
+    quantity_kind: ClassVar[str] = "dimensionless_scalar_field"
+    unit: ClassVar[str] = "1"
+    valid_range: ClassVar[tuple[float, float]] = (0.0, 1.0)
+
+    def __post_init__(self) -> None:
+        for name in (
+            "resource_id",
+            "field_revision",
+            "environment_id",
+            "environment_revision",
+            "world_id",
+            "physical_step_id",
+            "frame_id",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+            object.__setattr__(self, name, value.strip())
+        if (
+            type(self.source_causal_tick) is not int
+            or type(self.target_causal_tick) is not int
+            or self.source_causal_tick < 0
+            or self.target_causal_tick != self.source_causal_tick + 1
+        ):
+            raise ValueError(
+                "observation causal tick must immediately follow source tick"
+            )
+        if (
+            not isinstance(self.point_m, tuple)
+            or len(self.point_m) != 3
+            or any(
+                isinstance(component, bool)
+                or not isinstance(component, (int, float))
+                or not math.isfinite(component)
+                for component in self.point_m
+            )
+        ):
+            raise ValueError("point_m must contain three finite metre coordinates")
+        normalized = tuple(float(component) for component in self.point_m)
+        object.__setattr__(self, "point_m", normalized)
+        if (
+            isinstance(self.value, bool)
+            or not isinstance(self.value, (int, float))
+            or not math.isfinite(self.value)
+            or not 0.0 <= self.value <= 1.0
+        ):
+            raise ValueError("value must be finite and within [0, 1]")
+        object.__setattr__(self, "value", float(self.value))
 
 
 @dataclass(slots=True)
@@ -162,7 +285,13 @@ class IdentifiedFiniteScalarField:
     coordinate_unit: ClassVar[str] = "m"
 
     def __post_init__(self) -> None:
-        for name in ("resource_id", "field_revision", "environment_id", "environment_revision", "frame_id"):
+        for name in (
+            "resource_id",
+            "field_revision",
+            "environment_id",
+            "environment_revision",
+            "frame_id",
+        ):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be a non-empty string")
@@ -184,21 +313,29 @@ class IdentifiedFiniteScalarField:
         if not isinstance(frame, FrameDescriptor) or frame.frame_id != self.frame_id:
             raise ValueError("sampling frame must match the resource field frame")
         if not isinstance(correlation, PhysicalStepCorrelation):
-            raise ValueError("correlation must be a World-derived PhysicalStepCorrelation")
+            raise ValueError(
+                "correlation must be a World-derived PhysicalStepCorrelation"
+            )
         if (
             correlation.environment_id != self.environment_id
             or correlation.environment_revision != self.environment_revision
         ):
-            raise ValueError("correlation must match the active Environment identity and revision")
+            raise ValueError(
+                "correlation must match the active Environment identity and revision"
+            )
         if isinstance(point_m, (str, bytes)):
             raise ValueError("sample point must contain three finite metre coordinates")
         try:
             coordinates = tuple(point_m)
-            if len(coordinates) != 3 or any(isinstance(value, bool) for value in coordinates):
+            if len(coordinates) != 3 or any(
+                isinstance(value, bool) for value in coordinates
+            ):
                 raise ValueError
             normalized = tuple(float(value) for value in coordinates)
         except (TypeError, ValueError, OverflowError) as exc:
-            raise ValueError("sample point must contain three finite metre coordinates") from exc
+            raise ValueError(
+                "sample point must contain three finite metre coordinates"
+            ) from exc
         if not all(math.isfinite(value) for value in normalized):
             raise ValueError("sample point must contain three finite metre coordinates")
         return FiniteScalarFieldSample(
@@ -209,6 +346,69 @@ class IdentifiedFiniteScalarField:
             physical_step_id=correlation.physical_step_id,
             environment_id=self.environment_id,
             environment_revision=self.environment_revision,
+            frame_id=self.frame_id,
+            point_m=normalized,
+            value=self.state.field_at(normalized),
+        )
+
+    def project_observation(
+        self,
+        point_m: tuple[float, float, float],
+        *,
+        frame: FrameDescriptor,
+        context: EnvironmentObservationContext,
+    ) -> FiniteScalarFieldObservationProjection:
+        """Project the field at an adopted-state location and target applicability.
+
+        Call only after Environment has adopted the state for
+        ``context.target_causal_tick``. This method validates Environment-local
+        identity/revision/frame and computes the value from the current owner
+        state. It cannot verify that adoption occurred or authenticate World
+        commit; the World publication path must verify the exact committed cut
+        and owner reference independently.
+        """
+        if not isinstance(frame, FrameDescriptor) or frame.frame_id != self.frame_id:
+            raise ValueError("sampling frame must match the resource field frame")
+        if not isinstance(context, EnvironmentObservationContext):
+            raise TypeError("context must be EnvironmentObservationContext")
+        if (
+            context.environment_id != self.environment_id
+            or context.environment_revision != self.environment_revision
+        ):
+            raise ValueError(
+                "context must match the active Environment identity and revision"
+            )
+        if (
+            context.resource_id != self.resource_id
+            or context.field_revision != self.field_revision
+        ):
+            raise ValueError(
+                "context must match the active resource identity and field revision"
+            )
+        if isinstance(point_m, (str, bytes)):
+            raise ValueError("sample point must contain three finite metre coordinates")
+        try:
+            coordinates = tuple(point_m)
+            if len(coordinates) != 3 or any(
+                isinstance(value, bool) for value in coordinates
+            ):
+                raise ValueError
+            normalized = tuple(float(value) for value in coordinates)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(
+                "sample point must contain three finite metre coordinates"
+            ) from exc
+        if not all(math.isfinite(value) for value in normalized):
+            raise ValueError("sample point must contain three finite metre coordinates")
+        return FiniteScalarFieldObservationProjection(
+            resource_id=self.resource_id,
+            field_revision=self.field_revision,
+            environment_id=self.environment_id,
+            environment_revision=self.environment_revision,
+            world_id=context.world_id,
+            source_causal_tick=context.source_causal_tick,
+            target_causal_tick=context.target_causal_tick,
+            physical_step_id=context.physical_step_id,
             frame_id=self.frame_id,
             point_m=normalized,
             value=self.state.field_at(normalized),
@@ -225,7 +425,9 @@ class IdentifiedFiniteScalarField:
             "frame_id": self.frame_id,
             "state": self.state.checkpoint(),
         }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        return json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode()
 
     def verify_restoration(self, reference: OwnerRestorationReference) -> None:
         """Verify this restored field against an independent committed ref."""
@@ -248,8 +450,14 @@ class IdentifiedFiniteScalarField:
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ValueError("invalid scalar field checkpoint JSON") from exc
         expected = {
-            "checkpoint_type", "checkpoint_version", "resource_id",
-            "field_revision", "environment_id", "environment_revision", "frame_id", "state",
+            "checkpoint_type",
+            "checkpoint_version",
+            "resource_id",
+            "field_revision",
+            "environment_id",
+            "environment_revision",
+            "frame_id",
+            "state",
         }
         if (
             not isinstance(payload, dict)
@@ -270,7 +478,9 @@ class IdentifiedFiniteScalarField:
         )
 
     @classmethod
-    def validate_checkpoint(cls, encoded: bytes, owner_identity: str, schema_version: str) -> bool:
+    def validate_checkpoint(
+        cls, encoded: bytes, owner_identity: str, schema_version: str
+    ) -> bool:
         if schema_version != cls.OWNER_SCHEMA:
             return False
         try:
@@ -280,4 +490,10 @@ class IdentifiedFiniteScalarField:
         return checkpoint.resource_id == owner_identity
 
 
-__all__ = ["FiniteScalarFieldSample", "IdentifiedFiniteResource", "IdentifiedFiniteScalarField"]
+__all__ = [
+    "EnvironmentObservationContext",
+    "FiniteScalarFieldObservationProjection",
+    "FiniteScalarFieldSample",
+    "IdentifiedFiniteResource",
+    "IdentifiedFiniteScalarField",
+]

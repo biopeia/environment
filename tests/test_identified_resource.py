@@ -2,21 +2,34 @@ import json
 
 import pytest
 
-from environment.identified_resource import IdentifiedFiniteResource, IdentifiedFiniteScalarField
-from environment.resource import FiniteResourceState
-from environment.static_scene import FrameDescriptor, PhysicalStepCorrelation
+from environment import (
+    EnvironmentObservationContext,
+    FiniteResourceState,
+    FiniteScalarFieldObservationProjection,
+    FrameDescriptor,
+    IdentifiedFiniteResource,
+    IdentifiedFiniteScalarField,
+    PhysicalStepCorrelation,
+)
 
 
 def test_identified_resource_checkpoint_preserves_owner_identity_and_state() -> None:
-    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=3.5))
+    owner = IdentifiedFiniteResource(
+        "resource.alpha", FiniteResourceState(remaining=3.5)
+    )
 
     encoded = owner.checkpoint_bytes()
     restored = IdentifiedFiniteResource.from_checkpoint_bytes(encoded)
 
     payload = json.loads(encoded)
-    assert payload["checkpoint_type"] == "biopeia.environment.identified-finite-resource"
+    assert (
+        payload["checkpoint_type"] == "biopeia.environment.identified-finite-resource"
+    )
     assert payload["checkpoint_version"] == 1
-    assert payload["state"]["checkpoint_type"] == "biopeia.environment.finite-resource-state"
+    assert (
+        payload["state"]["checkpoint_type"]
+        == "biopeia.environment.finite-resource-state"
+    )
     assert payload["state"]["checkpoint_version"] == 1
     assert encoded == owner.checkpoint_bytes()
     assert restored.resource_id == "resource.alpha"
@@ -28,7 +41,9 @@ def test_identified_resource_checkpoint_rejects_invalid_identity_or_shape() -> N
         IdentifiedFiniteResource(" ", FiniteResourceState())
 
     payload = json.loads(
-        IdentifiedFiniteResource("resource.alpha", FiniteResourceState()).checkpoint_bytes()
+        IdentifiedFiniteResource(
+            "resource.alpha", FiniteResourceState()
+        ).checkpoint_bytes()
     )
     payload["resource_id"] = ""
     with pytest.raises(ValueError, match="resource_id"):
@@ -51,7 +66,9 @@ def test_identified_resource_checkpoint_rejects_invalid_identity_or_shape() -> N
 
 
 def test_identified_resource_checkpoint_rejects_unknown_fields_at_each_level() -> None:
-    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=3.5))
+    owner = IdentifiedFiniteResource(
+        "resource.alpha", FiniteResourceState(remaining=3.5)
+    )
     payload = json.loads(owner.checkpoint_bytes())
 
     payload["unexpected"] = "future-looking but unsupported"
@@ -65,7 +82,9 @@ def test_identified_resource_checkpoint_rejects_unknown_fields_at_each_level() -
 
 
 def test_owner_checkpoint_validation_checks_identity_schema_and_bytes() -> None:
-    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=3.5))
+    owner = IdentifiedFiniteResource(
+        "resource.alpha", FiniteResourceState(remaining=3.5)
+    )
     encoded = owner.checkpoint_bytes()
 
     assert IdentifiedFiniteResource.validate_checkpoint(
@@ -105,6 +124,21 @@ def _correlation() -> PhysicalStepCorrelation:
     )
 
 
+def _observation_context(**changes: object) -> EnvironmentObservationContext:
+    values: dict[str, object] = {
+        "world_id": "world.alpha",
+        "source_causal_tick": 17,
+        "target_causal_tick": 18,
+        "physical_step_id": "step.17",
+        "environment_id": "environment.alpha",
+        "environment_revision": "environment.rev-3",
+        "resource_id": "resource.alpha",
+        "field_revision": "field.rev-7",
+    }
+    values.update(changes)
+    return EnvironmentObservationContext(**values)  # type: ignore[arg-type]
+
+
 def test_scalar_field_uses_explicit_identity_range_frame_and_source_cut() -> None:
     field = IdentifiedFiniteScalarField(
         "resource.alpha",
@@ -115,54 +149,197 @@ def test_scalar_field_uses_explicit_identity_range_frame_and_source_cut() -> Non
         FiniteResourceState(position=(0.0, 0.0, 0.0), field_radius=2.0, remaining=1.0),
     )
 
-    sample = field.sample_field((1.0, 0.0, 0.0), frame=_frame(), correlation=_correlation())
+    sample = field.sample_field(
+        (1.0, 0.0, 0.0), frame=_frame(), correlation=_correlation()
+    )
 
     assert sample.resource_id == "resource.alpha"
     assert sample.field_revision == "field.rev-7"
     assert sample.environment_id == "environment.alpha"
     assert sample.environment_revision == "environment.rev-3"
     assert (sample.world_id, sample.causal_tick, sample.physical_step_id) == (
-        "world.alpha", 17, "step.17"
+        "world.alpha",
+        17,
+        "step.17",
     )
     assert sample.frame_id == "environment.frame"
     assert sample.point_m == (1.0, 0.0, 0.0)
     assert field.coordinate_unit == "m"
     assert field.frame_id == sample.frame_id
     assert (sample.quantity_kind, sample.unit, sample.valid_range) == (
-        "dimensionless_scalar_field", "1", (0.0, 1.0)
+        "dimensionless_scalar_field",
+        "1",
+        (0.0, 1.0),
     )
     assert sample.value == pytest.approx(0.25)
 
 
 def test_scalar_field_is_zero_at_boundary_and_when_depleted() -> None:
     field = IdentifiedFiniteScalarField(
-        "resource.alpha", "field.rev-1", "environment.alpha", "environment.rev-3", "environment.frame",
+        "resource.alpha",
+        "field.rev-1",
+        "environment.alpha",
+        "environment.rev-3",
+        "environment.frame",
         FiniteResourceState(position=(0.0, 0.0, 0.0), field_radius=2.0, remaining=1.0),
     )
-    assert field.sample_field((2.0, 0.0, 0.0), frame=_frame(), correlation=_correlation()).value == 0.0
+    assert (
+        field.sample_field(
+            (2.0, 0.0, 0.0), frame=_frame(), correlation=_correlation()
+        ).value
+        == 0.0
+    )
     field.state.remaining = 0.0
-    assert field.sample_field((0.0, 0.0, 0.0), frame=_frame(), correlation=_correlation()).value == 0.0
+    assert (
+        field.sample_field(
+            (0.0, 0.0, 0.0), frame=_frame(), correlation=_correlation()
+        ).value
+        == 0.0
+    )
 
 
 def test_scalar_field_rejects_wrong_frame_and_invalid_sampling_point() -> None:
     field = IdentifiedFiniteScalarField(
-        "resource.alpha", "field.rev-1", "environment.alpha", "environment.rev-3", "environment.frame", FiniteResourceState()
+        "resource.alpha",
+        "field.rev-1",
+        "environment.alpha",
+        "environment.rev-3",
+        "environment.frame",
+        FiniteResourceState(),
     )
     with pytest.raises(ValueError, match="sampling frame"):
-        field.sample_field((0.0, 0.0, 0.0), frame=_frame("other.frame"), correlation=_correlation())
+        field.sample_field(
+            (0.0, 0.0, 0.0), frame=_frame("other.frame"), correlation=_correlation()
+        )
     with pytest.raises(ValueError, match="sample point"):
-        field.sample_field((float("nan"), 0.0, 0.0), frame=_frame(), correlation=_correlation())
+        field.sample_field(
+            (float("nan"), 0.0, 0.0), frame=_frame(), correlation=_correlation()
+        )
     stale = PhysicalStepCorrelation(
-        world_id="world.alpha", causal_tick=17, physical_step_id="step.17",
-        environment_id="environment.alpha", environment_revision="environment.rev-2",
+        world_id="world.alpha",
+        causal_tick=17,
+        physical_step_id="step.17",
+        environment_id="environment.alpha",
+        environment_revision="environment.rev-2",
     )
     with pytest.raises(ValueError, match="active Environment"):
         field.sample_field((0.0, 0.0, 0.0), frame=_frame(), correlation=stale)
 
 
+def test_scalar_field_observation_projection_is_distinct_from_source_sample() -> None:
+    field = IdentifiedFiniteScalarField(
+        "resource.alpha",
+        "field.rev-7",
+        "environment.alpha",
+        "environment.rev-3",
+        "environment.frame",
+        FiniteResourceState(position=(0.0, 0.0, 0.0), field_radius=2.0, remaining=1.0),
+    )
+
+    source = field.sample_field(
+        (1.0, 0.0, 0.0), frame=_frame(), correlation=_correlation()
+    )
+    # Model owner adoption by changing the current authoritative field state
+    # before requesting the target-cut projection.
+    field.state.position = (1.0, 0.0, 0.0)
+    projection = field.project_observation(
+        (1.0, 0.0, 0.0), frame=_frame(), context=_observation_context()
+    )
+
+    assert source.causal_tick == 17
+    assert projection.source_causal_tick == 17
+    assert projection.target_causal_tick == 18
+    assert projection.physical_step_id == "step.17"
+    assert projection.world_id == "world.alpha"
+    assert projection.resource_id == "resource.alpha"
+    assert projection.field_revision == "field.rev-7"
+    assert projection.environment_id == "environment.alpha"
+    assert projection.environment_revision == "environment.rev-3"
+    assert projection.frame_id == "environment.frame"
+    assert projection.point_m == (1.0, 0.0, 0.0)
+    assert (projection.quantity_kind, projection.unit, projection.valid_range) == (
+        "dimensionless_scalar_field",
+        "1",
+        (0.0, 1.0),
+    )
+    assert source.value == pytest.approx(0.25)
+    assert projection.value == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"environment_id": "environment.other"}, "Environment identity"),
+        ({"environment_revision": "environment.rev-old"}, "Environment identity"),
+        ({"resource_id": "resource.other"}, "resource identity"),
+        ({"field_revision": "field.rev-old"}, "resource identity"),
+    ],
+)
+def test_scalar_field_observation_projection_rejects_stale_identity(
+    change: dict[str, object], message: str
+) -> None:
+    field = IdentifiedFiniteScalarField(
+        "resource.alpha",
+        "field.rev-7",
+        "environment.alpha",
+        "environment.rev-3",
+        "environment.frame",
+        FiniteResourceState(),
+    )
+    with pytest.raises(ValueError, match=message):
+        field.project_observation(
+            (0.0, 0.0, 0.0), frame=_frame(), context=_observation_context(**change)
+        )
+
+
+def test_scalar_field_observation_projection_rejects_wrong_frame_point_and_cut() -> (
+    None
+):
+    field = IdentifiedFiniteScalarField(
+        "resource.alpha",
+        "field.rev-7",
+        "environment.alpha",
+        "environment.rev-3",
+        "environment.frame",
+        FiniteResourceState(),
+    )
+    with pytest.raises(ValueError, match="sampling frame"):
+        field.project_observation(
+            (0.0, 0.0, 0.0), frame=_frame("other.frame"), context=_observation_context()
+        )
+    with pytest.raises(ValueError, match="sample point"):
+        field.project_observation(
+            (float("inf"), 0.0, 0.0), frame=_frame(), context=_observation_context()
+        )
+    with pytest.raises(ValueError, match="immediately follow"):
+        _observation_context(target_causal_tick=19)
+
+
+def test_scalar_field_observation_projection_value_rejects_out_of_range() -> None:
+    with pytest.raises(ValueError, match="within \\[0, 1\\]"):
+        FiniteScalarFieldObservationProjection(
+            resource_id="resource.alpha",
+            field_revision="field.rev-7",
+            environment_id="environment.alpha",
+            environment_revision="environment.rev-3",
+            world_id="world.alpha",
+            source_causal_tick=17,
+            target_causal_tick=18,
+            physical_step_id="step.17",
+            frame_id="environment.frame",
+            point_m=(0.0, 0.0, 0.0),
+            value=1.1,
+        )
+
+
 def test_scalar_field_checkpoint_is_versioned_closed_and_recoverable() -> None:
     field = IdentifiedFiniteScalarField(
-        "resource.alpha", "field.rev-2", "environment.alpha", "environment.rev-3", "environment.frame", FiniteResourceState(remaining=3.0)
+        "resource.alpha",
+        "field.rev-2",
+        "environment.alpha",
+        "environment.rev-3",
+        "environment.frame",
+        FiniteResourceState(remaining=3.0),
     )
     encoded = field.checkpoint_bytes()
     restored = IdentifiedFiniteScalarField.from_checkpoint_bytes(encoded)
