@@ -7,6 +7,8 @@ from environment.dynamic_state import (
 )
 from environment.identified_resource import (
     EnvironmentObservationContext,
+    FINITE_SCALAR_FIELD_FAMILY_ID,
+    FINITE_SCALAR_FIELD_SEMANTIC_REVISION,
     FiniteScalarFieldObservationProjection,
     FiniteScalarFieldSample,
     IdentifiedFiniteResource,
@@ -46,6 +48,8 @@ __all__ = [
     "EnvironmentGenesisProvenance",
     "EnvironmentGenesisSpec",
     "EnvironmentObservationContext",
+    "FINITE_SCALAR_FIELD_FAMILY_ID",
+    "FINITE_SCALAR_FIELD_SEMANTIC_REVISION",
     "EnvironmentPhysicalProjection",
     "FiniteResourceState",
     "FiniteScalarFieldObservationProjection",
