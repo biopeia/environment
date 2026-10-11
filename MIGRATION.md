@@ -623,3 +623,25 @@ implement the World solver adapter, choose MuJoCo execution parameters, adopt
 solver results, or complete `world#29`, `world#86`, or the end-to-end migration
 acceptance run. The coefficient values are explicit fixture/model configuration
 only and make no calibration or scientific-validity claim.
+
+### Finite scalar-field semantic family — issue #55
+
+| Target element | Disposition | Target path | Boundary / evidence |
+| --- | --- | --- | --- |
+| Semantic family identity | NEW TARGET CONTRACT | `FINITE_SCALAR_FIELD_FAMILY_ID`, `FINITE_SCALAR_FIELD_SEMANTIC_REVISION` | Stable family ID `biopeia.environment.finite-scalar-field`, semantic revision `1`; independent of transport and distinct from resource, receptor, and Observation-delivery identities. |
+| Claim meaning and authority | Environment-owned semantic family | `FiniteScalarFieldObservationProjection` | One dimensionless scalar value in `[0, 1]`, evaluated from Environment-owned finite-field state at an explicit point in a declared frame and applicable to the declared World causal step. The identified field owner is the primary semantic authority/asserter; its `project_observation` operation is the producer. This is a domain-derived field value, not a direct measurement or a receptor/transduced signal. |
+| Identity, scope, and correlation context | Explicit projection fields | `FiniteScalarFieldObservationProjection` | Carries Environment/resource identities and revisions, World/source/target ticks, physical-step identity, frame, point in metres, value, and SHA-256 of the exact Environment owner checkpoint used to evaluate the value. The digest lets World compare the projection source with its committed owner reference; it is not a substitute for that comparison, a material-lineage graph, proof of adoption, World commit, or delivery. |
+| Observation mapping and publication | DEFER / downstream contract | `biopeia/observation#26`, `biopeia/world#103` | Observation owns record/envelope mapping and World owns post-commit publication. This Environment change adds no Observation dependency and does not claim that an Environment projection has been published. Mapping tests must preserve the family identity/revision, authority, subject/scope, domain applicability, epistemic basis, and provenance, and reject missing or mismatched required context. |
+| Compatibility and evidence limits | Strict semantic revisioning | `tests/test_identified_resource.py` | Revision `1` describes this bounded fixture contract. Editorial clarifications or optional metadata that do not change interpretation are compatible. Changes to asserted meaning, unit/range, authority, subject identity, required frame/applicability, or field evaluation semantics are incompatible and require a new semantic revision; no transport version is implied. The finite-resource radial formula remains fixture-specific and is not a universal sensing law. |
+
+This slice declares an Environment semantic family and binds the existing
+owner-authored projection to it. Each sample/projection evaluates its value
+from the state restored from the same serialized checkpoint bytes whose digest
+it carries; this keeps value and digest aligned within the emitted record, but
+does not claim thread-safe atomicity against concurrent external mutation.
+The checkpoint digest identifies the exact owner state/configuration bytes
+associated with a sample; it does not establish that those bytes were adopted
+or committed. World must independently compare it with the owner reference in
+the committed cut. It does not choose an Observation wire format,
+delivery guarantee, storage model, or API; it does not establish scientific
+validity, receptor identity, Organism interpretation, or post-commit publication.
