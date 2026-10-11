@@ -6,14 +6,33 @@ checkpoint. It is not inferred from a caller's intervention request.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+import re
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from .resource import FiniteResourceState
 from .restoration import OwnerRestorationReference, verify_restored_owner
 from .static_scene import FrameDescriptor, PhysicalStepCorrelation
+
+
+FINITE_SCALAR_FIELD_FAMILY_ID = "biopeia.environment.finite-scalar-field"
+FINITE_SCALAR_FIELD_SEMANTIC_REVISION = "1"
+FINITE_SCALAR_FIELD_SUBJECT_TYPE = "environment.finite_resource_field"
+FINITE_SCALAR_FIELD_AUTHORITY = "ENVIRONMENT"
+FINITE_SCALAR_FIELD_EPISTEMIC_BASIS = "DOMAIN_DERIVED"
+FINITE_SCALAR_FIELD_ACQUISITION_BASIS = "environment_field_evaluation"
+FINITE_SCALAR_FIELD_ASSERTER = "environment.identified_finite_scalar_field"
+FINITE_SCALAR_FIELD_PRODUCER = (
+    "environment.identified_finite_scalar_field.project_observation"
+)
+
+
+def _validate_owner_checkpoint_digest(value: str) -> None:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise ValueError("source owner checkpoint digest must be lowercase SHA-256")
 
 
 @dataclass(slots=True)
@@ -105,12 +124,14 @@ class FiniteScalarFieldSample:
     frame_id: str
     point_m: tuple[float, float, float]
     value: float
+    source_owner_checkpoint_sha256: str
 
     quantity_kind = "dimensionless_scalar_field"
     unit = "1"
     valid_range = (0.0, 1.0)
 
     def __post_init__(self) -> None:
+        _validate_owner_checkpoint_digest(self.source_owner_checkpoint_sha256)
         for name in (
             "resource_id",
             "field_revision",
@@ -207,10 +228,19 @@ class FiniteScalarFieldObservationProjection:
     frame_id: str
     point_m: tuple[float, float, float]
     value: float
+    source_owner_checkpoint_sha256: str
 
     quantity_kind: ClassVar[str] = "dimensionless_scalar_field"
     unit: ClassVar[str] = "1"
     valid_range: ClassVar[tuple[float, float]] = (0.0, 1.0)
+    semantic_family_id: ClassVar[str] = FINITE_SCALAR_FIELD_FAMILY_ID
+    semantic_revision: ClassVar[str] = FINITE_SCALAR_FIELD_SEMANTIC_REVISION
+    semantic_subject_type: ClassVar[str] = FINITE_SCALAR_FIELD_SUBJECT_TYPE
+    semantic_authority: ClassVar[str] = FINITE_SCALAR_FIELD_AUTHORITY
+    semantic_asserter: ClassVar[str] = FINITE_SCALAR_FIELD_ASSERTER
+    semantic_producer: ClassVar[str] = FINITE_SCALAR_FIELD_PRODUCER
+    epistemic_basis: ClassVar[str] = FINITE_SCALAR_FIELD_EPISTEMIC_BASIS
+    acquisition_basis: ClassVar[str] = FINITE_SCALAR_FIELD_ACQUISITION_BASIS
 
     def __post_init__(self) -> None:
         for name in (
@@ -226,6 +256,7 @@ class FiniteScalarFieldObservationProjection:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be a non-empty string")
             object.__setattr__(self, name, value.strip())
+        _validate_owner_checkpoint_digest(self.source_owner_checkpoint_sha256)
         if (
             type(self.source_causal_tick) is not int
             or type(self.target_causal_tick) is not int
@@ -338,17 +369,26 @@ class IdentifiedFiniteScalarField:
             ) from exc
         if not all(math.isfinite(value) for value in normalized):
             raise ValueError("sample point must contain three finite metre coordinates")
+        source_checkpoint = self.checkpoint_bytes()
+        source_owner = self.from_checkpoint_bytes(source_checkpoint)
+        if (
+            source_owner.environment_id != correlation.environment_id
+            or source_owner.environment_revision != correlation.environment_revision
+            or source_owner.frame_id != frame.frame_id
+        ):
+            raise ValueError("checkpoint snapshot does not match sampling context")
         return FiniteScalarFieldSample(
-            resource_id=self.resource_id,
-            field_revision=self.field_revision,
+            resource_id=source_owner.resource_id,
+            field_revision=source_owner.field_revision,
             world_id=correlation.world_id,
             causal_tick=correlation.causal_tick,
             physical_step_id=correlation.physical_step_id,
-            environment_id=self.environment_id,
-            environment_revision=self.environment_revision,
-            frame_id=self.frame_id,
+            environment_id=source_owner.environment_id,
+            environment_revision=source_owner.environment_revision,
+            frame_id=source_owner.frame_id,
             point_m=normalized,
-            value=self.state.field_at(normalized),
+            value=source_owner.state.field_at(normalized),
+            source_owner_checkpoint_sha256=hashlib.sha256(source_checkpoint).hexdigest(),
         )
 
     def project_observation(
@@ -400,18 +440,29 @@ class IdentifiedFiniteScalarField:
             ) from exc
         if not all(math.isfinite(value) for value in normalized):
             raise ValueError("sample point must contain three finite metre coordinates")
+        source_checkpoint = self.checkpoint_bytes()
+        source_owner = self.from_checkpoint_bytes(source_checkpoint)
+        if (
+            source_owner.resource_id != context.resource_id
+            or source_owner.field_revision != context.field_revision
+            or source_owner.environment_id != context.environment_id
+            or source_owner.environment_revision != context.environment_revision
+            or source_owner.frame_id != frame.frame_id
+        ):
+            raise ValueError("checkpoint snapshot does not match observation context")
         return FiniteScalarFieldObservationProjection(
-            resource_id=self.resource_id,
-            field_revision=self.field_revision,
-            environment_id=self.environment_id,
-            environment_revision=self.environment_revision,
+            resource_id=source_owner.resource_id,
+            field_revision=source_owner.field_revision,
+            environment_id=source_owner.environment_id,
+            environment_revision=source_owner.environment_revision,
             world_id=context.world_id,
             source_causal_tick=context.source_causal_tick,
             target_causal_tick=context.target_causal_tick,
             physical_step_id=context.physical_step_id,
-            frame_id=self.frame_id,
+            frame_id=source_owner.frame_id,
             point_m=normalized,
-            value=self.state.field_at(normalized),
+            value=source_owner.state.field_at(normalized),
+            source_owner_checkpoint_sha256=hashlib.sha256(source_checkpoint).hexdigest(),
         )
 
     def checkpoint_bytes(self) -> bytes:

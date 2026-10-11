@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from environment import (
     EnvironmentObservationContext,
     FiniteResourceState,
+    FiniteScalarFieldSample,
     FiniteScalarFieldObservationProjection,
     FrameDescriptor,
     IdentifiedFiniteResource,
@@ -236,6 +238,7 @@ def test_scalar_field_observation_projection_is_distinct_from_source_sample() ->
         FiniteResourceState(position=(0.0, 0.0, 0.0), field_radius=2.0, remaining=1.0),
     )
 
+    source_checkpoint = field.checkpoint_bytes()
     source = field.sample_field(
         (1.0, 0.0, 0.0), frame=_frame(), correlation=_correlation()
     )
@@ -257,6 +260,8 @@ def test_scalar_field_observation_projection_is_distinct_from_source_sample() ->
     assert projection.environment_revision == "environment.rev-3"
     assert projection.frame_id == "environment.frame"
     assert projection.point_m == (1.0, 0.0, 0.0)
+    assert projection.semantic_family_id == "biopeia.environment.finite-scalar-field"
+    assert projection.semantic_revision == "1"
     assert (projection.quantity_kind, projection.unit, projection.valid_range) == (
         "dimensionless_scalar_field",
         "1",
@@ -264,6 +269,53 @@ def test_scalar_field_observation_projection_is_distinct_from_source_sample() ->
     )
     assert source.value == pytest.approx(0.25)
     assert projection.value == pytest.approx(1.0)
+    assert source.source_owner_checkpoint_sha256 == hashlib.sha256(source_checkpoint).hexdigest()
+    assert projection.source_owner_checkpoint_sha256 == hashlib.sha256(
+        field.checkpoint_bytes()
+    ).hexdigest()
+    assert projection.semantic_subject_type == "environment.finite_resource_field"
+    assert projection.semantic_authority == "ENVIRONMENT"
+    assert projection.semantic_asserter == "environment.identified_finite_scalar_field"
+    assert projection.semantic_producer == (
+        "environment.identified_finite_scalar_field.project_observation"
+    )
+    assert projection.epistemic_basis == "DOMAIN_DERIVED"
+    assert projection.acquisition_basis == "environment_field_evaluation"
+
+
+def test_scalar_field_projection_rejects_invalid_checkpoint_digest() -> None:
+    with pytest.raises(ValueError, match="lowercase SHA-256"):
+        FiniteScalarFieldObservationProjection(
+            resource_id="resource.alpha",
+            field_revision="field.rev-7",
+            environment_id="environment.alpha",
+            environment_revision="environment.rev-3",
+            world_id="world.alpha",
+            source_causal_tick=17,
+            target_causal_tick=18,
+            physical_step_id="step.17",
+            frame_id="environment.frame",
+            point_m=(0.0, 0.0, 0.0),
+            value=0.5,
+            source_owner_checkpoint_sha256="not-a-digest",
+        )
+
+
+def test_scalar_field_sample_rejects_invalid_checkpoint_digest() -> None:
+    with pytest.raises(ValueError, match="lowercase SHA-256"):
+        FiniteScalarFieldSample(
+            resource_id="resource.alpha",
+            field_revision="field.rev-7",
+            world_id="world.alpha",
+            causal_tick=17,
+            physical_step_id="step.17",
+            environment_id="environment.alpha",
+            environment_revision="environment.rev-3",
+            frame_id="environment.frame",
+            point_m=(0.0, 0.0, 0.0),
+            value=0.5,
+            source_owner_checkpoint_sha256="not-a-digest",
+        )
 
 
 @pytest.mark.parametrize(
@@ -329,6 +381,7 @@ def test_scalar_field_observation_projection_value_rejects_out_of_range() -> Non
             frame_id="environment.frame",
             point_m=(0.0, 0.0, 0.0),
             value=1.1,
+            source_owner_checkpoint_sha256="0" * 64,
         )
 
 
