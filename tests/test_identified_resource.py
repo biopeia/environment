@@ -51,12 +51,16 @@ def test_committed_resource_projection_requires_exact_world_owner_reference() ->
         locator="not-opened-by-projection",
         sha256=hashlib.sha256(encoded).hexdigest(),
     )
-    projection = project_committed_resource_state(
-        encoded,
-        owner_reference=reference,
+    cut = SimpleNamespace(
         world_id="world.alpha",
         causal_tick=7,
         commit_id="commit-7",
+        owner_checkpoint_references=(reference,),
+    )
+    projection = project_committed_resource_state(
+        encoded,
+        committed_cut=cut,
+        owner_reference=reference,
     )
     assert projection.remaining == 2.75
     assert projection.resource_id == owner.resource_id
@@ -65,9 +69,22 @@ def test_committed_resource_projection_requires_exact_world_owner_reference() ->
     assert projection.commit_id == "commit-7"
     assert projection.source_owner_checkpoint_sha256 == reference.sha256
 
-    with pytest.raises(ValueError, match="committed Environment owner reference"):
+    with pytest.raises(ValueError, match="not in the supplied World cut"):
         project_committed_resource_state(
             encoded,
+            committed_cut=SimpleNamespace(
+                world_id="world.alpha",
+                causal_tick=7,
+                commit_id="commit-7",
+                owner_checkpoint_references=(),
+            ),
+            owner_reference=reference,
+        )
+
+    with pytest.raises(ValueError, match="not in the supplied World cut"):
+        project_committed_resource_state(
+            encoded,
+            committed_cut=cut,
             owner_reference=SimpleNamespace(
                 owner="environment",
                 owner_identity=owner.resource_id,
@@ -76,9 +93,6 @@ def test_committed_resource_projection_requires_exact_world_owner_reference() ->
                 locator="unused",
                 sha256="0" * 64,
             ),
-            world_id="world.alpha",
-            causal_tick=7,
-            commit_id="commit-7",
         )
 
 
