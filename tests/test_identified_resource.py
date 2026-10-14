@@ -41,7 +41,9 @@ def test_identified_resource_checkpoint_preserves_owner_identity_and_state() -> 
 
 
 def test_committed_resource_projection_requires_exact_world_owner_reference() -> None:
-    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=2.75))
+    owner = IdentifiedFiniteResource(
+        "resource.alpha", FiniteResourceState(remaining=2.75)
+    )
     encoded = owner.checkpoint_bytes()
     reference = SimpleNamespace(
         owner="environment",
@@ -97,7 +99,9 @@ def test_committed_resource_projection_requires_exact_world_owner_reference() ->
 
 
 def test_committed_resource_projection_rejects_wrong_digest_on_listed_reference() -> None:
-    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=2.75))
+    owner = IdentifiedFiniteResource(
+        "resource.alpha", FiniteResourceState(remaining=2.75)
+    )
     encoded = owner.checkpoint_bytes()
     reference = SimpleNamespace(
         owner="environment",
@@ -118,6 +122,83 @@ def test_committed_resource_projection_rejects_wrong_digest_on_listed_reference(
         project_committed_resource_state(
             encoded,
             committed_cut=cut,
+            owner_reference=reference,
+        )
+
+
+@pytest.mark.parametrize(
+    ("reference_changes", "message"),
+    [
+        ({"owner": "world"}, "checkpoint does not match"),
+        ({"schema_version": "environment-resource-v999"}, "checkpoint does not match"),
+        ({"owner_identity": "resource.other"}, "checkpoint resource identity differs"),
+    ],
+)
+def test_committed_resource_projection_rejects_mismatched_listed_owner_reference(
+    reference_changes: dict[str, str], message: str
+) -> None:
+    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=2.75))
+    encoded = owner.checkpoint_bytes()
+    values = {
+        "owner": "environment",
+        "owner_identity": owner.resource_id,
+        "checkpoint_id": "environment-cut-7",
+        "schema_version": owner.OWNER_SCHEMA,
+        "locator": "unused",
+        "sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+    values.update(reference_changes)
+    reference = SimpleNamespace(**values)
+    cut = SimpleNamespace(
+        world_id="world.alpha",
+        causal_tick=7,
+        commit_id="commit-7",
+        owner_checkpoint_references=(reference,),
+    )
+
+    with pytest.raises(ValueError, match=message):
+        project_committed_resource_state(
+            encoded,
+            committed_cut=cut,
+            owner_reference=reference,
+        )
+
+
+@pytest.mark.parametrize(
+    ("cut_changes", "message"),
+    [
+        ({"world_id": " "}, "identify a World"),
+        ({"causal_tick": True}, "valid causal tick"),
+        ({"causal_tick": -1}, "valid causal tick"),
+        ({"commit_id": " "}, "identify a commit"),
+        ({"owner_checkpoint_references": []}, "not in the supplied World cut"),
+    ],
+)
+def test_committed_resource_projection_rejects_malformed_world_cut_fields(
+    cut_changes: dict[str, object], message: str
+) -> None:
+    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=2.75))
+    encoded = owner.checkpoint_bytes()
+    reference = SimpleNamespace(
+        owner="environment",
+        owner_identity=owner.resource_id,
+        checkpoint_id="environment-cut-7",
+        schema_version=owner.OWNER_SCHEMA,
+        locator="unused",
+        sha256=hashlib.sha256(encoded).hexdigest(),
+    )
+    cut_values: dict[str, object] = {
+        "world_id": "world.alpha",
+        "causal_tick": 7,
+        "commit_id": "commit-7",
+        "owner_checkpoint_references": (reference,),
+    }
+    cut_values.update(cut_changes)
+
+    with pytest.raises(ValueError, match=message):
+        project_committed_resource_state(
+            encoded,
+            committed_cut=SimpleNamespace(**cut_values),
             owner_reference=reference,
         )
 
