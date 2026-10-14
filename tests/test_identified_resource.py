@@ -96,6 +96,32 @@ def test_committed_resource_projection_requires_exact_world_owner_reference() ->
         )
 
 
+def test_committed_resource_projection_rejects_wrong_digest_on_listed_reference() -> None:
+    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=2.75))
+    encoded = owner.checkpoint_bytes()
+    reference = SimpleNamespace(
+        owner="environment",
+        owner_identity=owner.resource_id,
+        checkpoint_id="environment-cut-7",
+        schema_version=owner.OWNER_SCHEMA,
+        locator="unused",
+        sha256="0" * 64,
+    )
+    cut = SimpleNamespace(
+        world_id="world.alpha",
+        causal_tick=7,
+        commit_id="commit-7",
+        owner_checkpoint_references=(reference,),
+    )
+
+    with pytest.raises(ValueError, match="checkpoint does not match"):
+        project_committed_resource_state(
+            encoded,
+            committed_cut=cut,
+            owner_reference=reference,
+        )
+
+
 def test_identified_resource_checkpoint_rejects_invalid_identity_or_shape() -> None:
     with pytest.raises(ValueError, match="resource_id"):
         IdentifiedFiniteResource(" ", FiniteResourceState())
