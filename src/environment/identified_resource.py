@@ -11,7 +11,7 @@ import json
 import math
 import re
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Protocol
 
 from .resource import FiniteResourceState
 from .restoration import OwnerRestorationReference, verify_restored_owner
@@ -33,6 +33,93 @@ FINITE_SCALAR_FIELD_PRODUCER = (
 def _validate_owner_checkpoint_digest(value: str) -> None:
     if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
         raise ValueError("source owner checkpoint digest must be lowercase SHA-256")
+
+
+class _CommittedCheckpointReference(Protocol):
+    """Structural view of a World-issued owner checkpoint reference."""
+
+    owner: str
+    owner_identity: str
+    checkpoint_id: str
+    schema_version: str
+    sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceStateObservationProjection:
+    """Environment-owned post-adoption resource state at one committed cut.
+
+    ``remaining`` is copied from the exact referenced owner checkpoint. Its
+    numeric representation has no declared physical unit or transfer meaning.
+    """
+
+    resource_id: str
+    remaining: float
+    world_id: str
+    causal_tick: int
+    commit_id: str
+    checkpoint_id: str
+    checkpoint_type: str
+    checkpoint_version: int
+    checkpoint_schema: str
+    source_owner_checkpoint_sha256: str
+
+    semantic_family_id: ClassVar[str] = "biopeia.environment.resource_state_snapshot"
+    semantic_revision: ClassVar[str] = "1"
+    semantic_authority: ClassVar[str] = "ENVIRONMENT"
+    semantic_asserter: ClassVar[str] = "environment.identified_finite_resource"
+    semantic_producer: ClassVar[str] = "environment.identified_finite_resource.project_committed_state"
+
+
+def project_committed_resource_state(
+    checkpoint_bytes: bytes,
+    *,
+    owner_reference: _CommittedCheckpointReference,
+    world_id: str,
+    causal_tick: int,
+    commit_id: str,
+) -> ResourceStateObservationProjection:
+    """Project only the exact Environment checkpoint in a World cut.
+
+    The World publication boundary remains responsible for proving the cut is
+    committed. This owner function proves that the value was decoded from the
+    exact bytes named by the provided opaque committed owner reference.
+    """
+    if not isinstance(checkpoint_bytes, bytes):
+        raise ValueError("Environment checkpoint snapshot must be bytes")
+    for name, value in (("world_id", world_id), ("commit_id", commit_id)):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{name} must be non-empty text")
+    if type(causal_tick) is not int or causal_tick < 0:
+        raise ValueError("causal_tick must be a non-negative integer")
+    expected_digest = hashlib.sha256(checkpoint_bytes).hexdigest()
+    if (
+        getattr(owner_reference, "owner", None) != "environment"
+        or getattr(owner_reference, "schema_version", None) != IdentifiedFiniteResource.OWNER_SCHEMA
+        or getattr(owner_reference, "sha256", None) != expected_digest
+    ):
+        raise ValueError("checkpoint does not match the committed Environment owner reference")
+    checkpoint_id = getattr(owner_reference, "checkpoint_id", None)
+    owner_identity = getattr(owner_reference, "owner_identity", None)
+    if not isinstance(checkpoint_id, str) or not checkpoint_id.strip():
+        raise ValueError("committed Environment checkpoint id is required")
+    if not isinstance(owner_identity, str) or not owner_identity.strip():
+        raise ValueError("committed Environment owner identity is required")
+    restored = IdentifiedFiniteResource.from_checkpoint_bytes(checkpoint_bytes)
+    if restored.resource_id != owner_identity:
+        raise ValueError("checkpoint resource identity differs from committed owner reference")
+    return ResourceStateObservationProjection(
+        resource_id=restored.resource_id,
+        remaining=restored.state.remaining,
+        world_id=world_id,
+        causal_tick=causal_tick,
+        commit_id=commit_id,
+        checkpoint_id=checkpoint_id,
+        checkpoint_type=IdentifiedFiniteResource.CHECKPOINT_TYPE,
+        checkpoint_version=IdentifiedFiniteResource.CHECKPOINT_VERSION,
+        checkpoint_schema=IdentifiedFiniteResource.OWNER_SCHEMA,
+        source_owner_checkpoint_sha256=expected_digest,
+    )
 
 
 @dataclass(slots=True)
@@ -545,6 +632,8 @@ __all__ = [
     "EnvironmentObservationContext",
     "FiniteScalarFieldObservationProjection",
     "FiniteScalarFieldSample",
+    "ResourceStateObservationProjection",
+    "project_committed_resource_state",
     "IdentifiedFiniteResource",
     "IdentifiedFiniteScalarField",
 ]

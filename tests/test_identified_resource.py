@@ -1,5 +1,6 @@
 import hashlib
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,6 +13,7 @@ from environment import (
     IdentifiedFiniteResource,
     IdentifiedFiniteScalarField,
     PhysicalStepCorrelation,
+    project_committed_resource_state,
 )
 
 
@@ -36,6 +38,48 @@ def test_identified_resource_checkpoint_preserves_owner_identity_and_state() -> 
     assert encoded == owner.checkpoint_bytes()
     assert restored.resource_id == "resource.alpha"
     assert restored.state.checkpoint() == owner.state.checkpoint()
+
+
+def test_committed_resource_projection_requires_exact_world_owner_reference() -> None:
+    owner = IdentifiedFiniteResource("resource.alpha", FiniteResourceState(remaining=2.75))
+    encoded = owner.checkpoint_bytes()
+    reference = SimpleNamespace(
+        owner="environment",
+        owner_identity=owner.resource_id,
+        checkpoint_id="environment-cut-7",
+        schema_version=owner.OWNER_SCHEMA,
+        locator="not-opened-by-projection",
+        sha256=hashlib.sha256(encoded).hexdigest(),
+    )
+    projection = project_committed_resource_state(
+        encoded,
+        owner_reference=reference,
+        world_id="world.alpha",
+        causal_tick=7,
+        commit_id="commit-7",
+    )
+    assert projection.remaining == 2.75
+    assert projection.resource_id == owner.resource_id
+    assert projection.world_id == "world.alpha"
+    assert projection.causal_tick == 7
+    assert projection.commit_id == "commit-7"
+    assert projection.source_owner_checkpoint_sha256 == reference.sha256
+
+    with pytest.raises(ValueError, match="committed Environment owner reference"):
+        project_committed_resource_state(
+            encoded,
+            owner_reference=SimpleNamespace(
+                owner="environment",
+                owner_identity=owner.resource_id,
+                checkpoint_id="environment-cut-7",
+                schema_version=owner.OWNER_SCHEMA,
+                locator="unused",
+                sha256="0" * 64,
+            ),
+            world_id="world.alpha",
+            causal_tick=7,
+            commit_id="commit-7",
+        )
 
 
 def test_identified_resource_checkpoint_rejects_invalid_identity_or_shape() -> None:

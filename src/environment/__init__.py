@@ -13,6 +13,8 @@ from environment.identified_resource import (
     FiniteScalarFieldSample,
     IdentifiedFiniteResource,
     IdentifiedFiniteScalarField,
+    ResourceStateObservationProjection,
+    project_committed_resource_state,
 )
 from environment.physical import PhysicalSphere, project_resource_geometry
 from environment.procedural_genesis import (
@@ -54,6 +56,7 @@ __all__ = [
     "FiniteResourceState",
     "FiniteScalarFieldObservationProjection",
     "FiniteScalarFieldSample",
+    "ResourceStateObservationProjection",
     "FrameDescriptor",
     "IdentifiedFiniteResource",
     "IdentifiedFiniteScalarField",
@@ -68,5 +71,6 @@ __all__ = [
     "StaticSphere",
     "generate_procedural_environment",
     "project_resource_geometry",
+    "project_committed_resource_state",
     "project_static_scene",
 ]
