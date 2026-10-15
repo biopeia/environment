@@ -40,6 +40,38 @@ def test_identified_resource_checkpoint_preserves_owner_identity_and_state() -> 
     assert restored.state.checkpoint() == owner.state.checkpoint()
 
 
+def test_resource_snapshot_cannot_be_misread_as_scalar_field_sensing() -> None:
+    owner = IdentifiedFiniteResource(
+        "resource.alpha", FiniteResourceState(remaining=0.4)
+    )
+    encoded = owner.checkpoint_bytes()
+    reference = SimpleNamespace(
+        owner="environment",
+        owner_identity=owner.resource_id,
+        checkpoint_id="environment-cut-7",
+        schema_version=owner.OWNER_SCHEMA,
+        locator="unused",
+        sha256=hashlib.sha256(encoded).hexdigest(),
+    )
+    cut = SimpleNamespace(
+        world_id="world.alpha",
+        causal_tick=7,
+        commit_id="commit-7",
+        owner_checkpoint_references=(reference,),
+    )
+
+    snapshot = project_committed_resource_state(
+        encoded, committed_cut=cut, owner_reference=reference
+    )
+
+    assert snapshot.semantic_family_id == "biopeia.environment.resource_state_snapshot"
+    assert snapshot.remaining == 0.4
+    assert not hasattr(snapshot, "unit")
+    assert not hasattr(snapshot, "quantity_kind")
+    with pytest.raises(ValueError, match="invalid scalar field checkpoint fields"):
+        IdentifiedFiniteScalarField.from_checkpoint_bytes(encoded)
+
+
 def test_committed_resource_projection_requires_exact_world_owner_reference() -> None:
     owner = IdentifiedFiniteResource(
         "resource.alpha", FiniteResourceState(remaining=2.75)
