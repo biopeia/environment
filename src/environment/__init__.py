@@ -39,6 +39,10 @@ from environment.static_scene import (
     StaticSphere,
     project_static_scene,
 )
+from environment.spatial_render import (
+    canonical_spatial_render_scene_bytes,
+    project_spatial_render_scene,
+)
 
 __all__ = [
     "GENERATOR_ID",
@@ -72,5 +76,7 @@ __all__ = [
     "generate_procedural_environment",
     "project_resource_geometry",
     "project_committed_resource_state",
+    "project_spatial_render_scene",
+    "canonical_spatial_render_scene_bytes",
     "project_static_scene",
 ]
