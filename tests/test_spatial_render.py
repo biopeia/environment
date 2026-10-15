@@ -63,6 +63,22 @@ def test_sphere_descriptor_matches_approved_jcs_vector():
     }]
 
 
+def test_ground_plane_projection_preserves_exact_owner_parameters():
+    result = project_spatial_render_scene(
+        make_scene(objects=(StaticGroundPlane("ground-z", (0, 0, 1), 2.5),))
+    )
+    assert result["items"] == [{
+        "object_id": "ground-z",
+        "kind": "ground_plane",
+        "frame_id": "environment.frame",
+        "normal": [0.0, 0.0, 1.0],
+        "offset_m": 2.5,
+    }]
+    assert result["render_geometry_sha256"] == hashlib.sha256(
+        rfc8785.dumps({key: value for key, value in result.items() if key != "render_geometry_sha256"})
+    ).hexdigest()
+
+
 def test_projection_orders_items_by_utf8_id_and_ignores_solver_values():
     first = make_scene(
         objects=(StaticGroundPlane("z-ground", (0, 0, 1)), StaticGroundPlane("a-wall", (1, 0, 0), 2))

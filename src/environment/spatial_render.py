@@ -61,6 +61,8 @@ def project_spatial_render_scene(scene: StaticPhysicalScene) -> dict[str, Any]:
     """
     if not isinstance(scene, StaticPhysicalScene):
         raise ValueError("scene must be StaticPhysicalScene")
+    if len(scene.objects) + len(scene.spheres) > MAX_ITEMS:
+        raise ValueError(f"scene exceeds the {MAX_ITEMS}-item render bound")
 
     frame = scene.frame
     frame_payload = {
@@ -99,8 +101,6 @@ def project_spatial_render_scene(scene: StaticPhysicalScene) -> dict[str, Any]:
             "radius_m": radius,
         }))
     item_rows.sort(key=lambda row: row[0])
-    if len(item_rows) > MAX_ITEMS:
-        raise ValueError(f"scene exceeds the {MAX_ITEMS}-item render bound")
     if len({item_id for item_id, _ in item_rows}) != len(item_rows):
         raise ValueError("object_id values must be unique")
 
