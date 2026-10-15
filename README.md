@@ -30,4 +30,9 @@ itself change World's restore orchestration.
 
 The former extracted hex-grid fields, cell-based terrain/hydrology, and coupled `EnvironmentState`/field-law APIs were removed because they did not establish a justified TARGET contract. There is no hex-to-3D conversion or backwards-compatibility shim. Procedural sphere placement is target-authored and carries no cognitive labels; it makes no non-overlap or scientific-validity claim. See [`MIGRATION.md`](MIGRATION.md) for scoped provenance, evidence, and limitations; the overall source inventory remains open.
 
-The import package and distribution are both named `environment`. The package uses the Python standard library only.
+The import package and distribution are both named `environment`. The package
+uses the Python standard library plus the pinned `rfc8785` dependency for the
+bounded static render descriptor's deterministic digest. The read-only
+`environment.spatial_render` projection covers only owner-authored static
+planes and spheres. It does not publish or transport data, establish causal
+association, or claim compatibility with another domain's coordinate frame.
